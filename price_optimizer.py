@@ -200,6 +200,56 @@ def call_mistral(prompt: str) -> float:
     return float(match.group())
 
 
+def call_groq(prompt: str, model: str | None = None) -> float:
+    """Use Groq API to get a numeric price recommendation."""
+    if requests is None:
+        raise RuntimeError("requests package not installed")
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY environment variable not set")
+    if not model:
+        model = os.environ.get("GROQ_MODEL", "meta-llama/llama-guard-4-12b")
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    data = {"model": model, "messages": [{"role": "user", "content": prompt}]}
+    resp = requests.post(url, headers=headers, json=data, timeout=10)
+    resp.raise_for_status()
+    content = resp.json()["choices"][0]["message"]["content"]
+    match = re.search(r"\d+(?:\.\d+)?", content)
+    if not match:
+        raise ValueError("No numeric price returned")
+    return float(match.group())
+
+
+def call_gemini(prompt: str) -> float:
+    """Use Google's Gemini API to get a numeric price recommendation."""
+    if requests is None:
+        raise RuntimeError("requests package not installed")
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY environment variable not set")
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro-002:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    data = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
+    resp = requests.post(url, headers=headers, json=data, timeout=10)
+    resp.raise_for_status()
+    content = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+    match = re.search(r"\d+(?:\.\d+)?", content)
+    if not match:
+        raise ValueError("No numeric price returned")
+    return float(match.group())
+
+
+def call_llm(prompt: str) -> float:
+    """Try multiple LLM providers and return the first successful price."""
+    for func in (call_mistral, call_groq, call_gemini):
+        try:
+            return func(prompt)
+        except Exception:
+            continue
+    raise RuntimeError("No LLM API available")
+
+
 def simulate_profit(price: float, unit_cost: float, avg_competitor: float, demand_base: float = 100.0, elasticity: float = 1.2) -> float:
     """Simple demand model to estimate profit for backtesting."""
     if price <= 0:
@@ -245,7 +295,7 @@ def suggest_price(
         "Only respond with the number."
     )
     try:
-        price = call_mistral(prompt)
+        price = call_llm(prompt)
     except Exception:
         price = optimize_price(
             prices,
