@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Price optimizer for Dzukou products."""
+
 import csv
 import os
 import re
