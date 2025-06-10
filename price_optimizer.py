@@ -10,6 +10,10 @@ from typing import Dict, List
 
 PRICE_STEP = 0.25  # granularity for optimizer
 
+# Maximum ratio of recommended price to average competitor price to keep
+# suggestions within a competitive range.
+MAX_ABOVE_MEAN = 1.3
+
 
 def clean_prices(prices: List[float]) -> List[float]:
     """Remove outliers and invalid data from scraped prices."""
@@ -30,29 +34,37 @@ def optimize_price(
     margin: float,
     elasticity: float = 1.2,
     max_markup: float = 1.8,
+    max_increase: float = 0.30,
+    max_decrease: float = 0.25,
     price_step: float = PRICE_STEP,
     demand_base: float = 100.0,
+    mean_cap_ratio: float = MAX_ABOVE_MEAN,
 ) -> float:
     """Search for a price that maximizes estimated profit.
 
-    This optimizer explores prices both above and below the current price
-    (down to the minimal profitable price) and returns the price yielding the
-    highest simulated profit.
+    The optimizer explores prices above and below the current price while
+    respecting limits on how far the new price may deviate from the
+    competitor average and the current price. It returns the price yielding
+    the highest simulated profit within these boundaries.
     """
     base = unit_cost * (1 + margin)
 
     if not prices:
         avg = current_price
         competitor_high = current_price
+        competitor_low = current_price
     else:
         avg = statistics.mean(prices)
         competitor_high = max(prices)
+        competitor_low = min(prices)
 
-    # explore from the minimal acceptable price up to a generous markup
-    low = base
+    # explore from the minimal acceptable price up to a generous markup,
+    # while respecting caps relative to the current price and competitor mean
+    low = max(base, competitor_low, current_price * (1 - max_decrease))
     high = max(current_price, competitor_high, avg, base) * max_markup
+    high = min(high, current_price * (1 + max_increase), avg * mean_cap_ratio)
     if high < low:
-        high = low * 1.5
+        high = low
 
     best_price = base
     best_profit = -1e9
@@ -123,6 +135,40 @@ MAX_MARKUP = {
     "Cushion covers": 1.6,
     "Coasters & placements": 1.6,
     "Towels": 1.5,
+}
+
+# Maximum allowed price increase relative to the current price
+MAX_INCREASE = {
+    "default": 0.30,
+    "Sunglasses": 0.30,
+    "Bottles": 0.30,
+    "Phone accessories": 0.30,
+    "Notebook": 0.30,
+    "Lunchbox": 0.30,
+    "Premium shawls": 0.30,
+    "Eri silk shawls": 0.30,
+    "Cotton scarf": 0.30,
+    "Other scarves and shawls": 0.30,
+    "Cushion covers": 0.30,
+    "Coasters & placements": 0.30,
+    "Towels": 0.30,
+}
+
+# Maximum allowed price decrease relative to the current price
+MAX_DECREASE = {
+    "default": 0.25,
+    "Sunglasses": 0.25,
+    "Bottles": 0.25,
+    "Phone accessories": 0.25,
+    "Notebook": 0.25,
+    "Lunchbox": 0.25,
+    "Premium shawls": 0.25,
+    "Eri silk shawls": 0.25,
+    "Cotton scarf": 0.25,
+    "Other scarves and shawls": 0.25,
+    "Cushion covers": 0.25,
+    "Coasters & placements": 0.25,
+    "Towels": 0.25,
 }
 
 
@@ -282,6 +328,8 @@ def suggest_price(
     margin = PROFIT_MARGINS.get(category, 0.15)
     elasticity = DEMAND_ELASTICITY.get(category, 1.2)
     max_markup = MAX_MARKUP.get(category, 1.8)
+    max_increase = MAX_INCREASE.get(category, MAX_INCREASE["default"])
+    max_decrease = MAX_DECREASE.get(category, MAX_DECREASE["default"])
 
     if not prices:
         return round_price(max(unit * (1 + margin), cur))
@@ -316,7 +364,16 @@ def suggest_price(
             margin,
             elasticity=elasticity,
             max_markup=max_markup,
+            max_increase=max_increase,
+            max_decrease=max_decrease,
+            mean_cap_ratio=MAX_ABOVE_MEAN,
         )
+    else:
+        base = unit * (1 + margin)
+        price = max(price, base)
+        price = min(price, cur * (1 + max_increase))
+        price = max(price, cur * (1 - max_decrease))
+        price = min(price, avg * MAX_ABOVE_MEAN)
     return round_price(price)
 
 
