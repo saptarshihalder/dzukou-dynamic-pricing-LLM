@@ -24,5 +24,6 @@ python3 price_optimizer.py
 python3 dashboard.py
 ```
    - The dashboard is saved to `dashboard.html` and can be opened in any browser.
+   - It now includes interactive charts and uses Bootstrap styling for a cleaner look.
 
 
