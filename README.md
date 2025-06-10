@@ -18,7 +18,7 @@ pip install pandas plotly requests
 ```bash
 python3 price_optimizer.py
 ```
-   - The script tries to query multiple LLM providers using the environment variables `MISTRAL_API_KEY`, `GROQ_API_KEY`, and `GEMINI_API_KEY`. If these variables are not set or `requests` is missing, it falls back to a local price optimizer.
+   - The script tries to query multiple LLM providers using the environment variables `MISTRAL_API_KEY`, `GROQ_API_KEY`, and `GEMINI_API_KEY`. If these variables are not set or `requests` is missing, it falls back to a local price optimizer. The local optimizer now relies on a logistic demand curve and filters competitor prices by category keywords to remove irrelevant items.
 3. Create an HTML dashboard to inspect profit deltas:
 ```bash
 python3 dashboard.py

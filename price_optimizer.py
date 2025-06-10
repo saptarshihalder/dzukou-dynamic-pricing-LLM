@@ -43,6 +43,7 @@ def optimize_price(
     max_decrease: float = 0.25,
     price_step: float = PRICE_STEP,
     demand_base: float = 100.0,
+    saturation: float = 1.0,
     mean_cap_ratio: float | None = None,
 ) -> float:
     """Search for a price that maximizes estimated profit.
@@ -81,7 +82,14 @@ def optimize_price(
     best_profit = -1e9
     price = low
     while price <= high:
-        profit = simulate_profit(price, unit_cost, avg, demand_base, elasticity)
+        profit = simulate_profit(
+            price,
+            unit_cost,
+            avg,
+            demand_base,
+            elasticity,
+            saturation,
+        )
         if profit > best_profit:
             best_profit = profit
             best_price = price
@@ -127,6 +135,24 @@ DEMAND_ELASTICITY = {
     "Eri silk shawls": 0.9,
     "Cotton scarf": 1.1,
     "Other scarves and shawls": 1.1,
+    "Cushion covers": 1.0,
+    "Coasters & placements": 1.0,
+    "Towels": 1.0,
+}
+
+# Maximum market saturation factor per category. A value of 1.0 means
+# demand cannot exceed ``demand_base`` units when the price approaches
+# zero. These can be tuned from historical sales data.
+DEMAND_SATURATION = {
+    "Sunglasses": 1.0,
+    "Bottles": 1.0,
+    "Phone accessories": 1.0,
+    "Notebook": 1.0,
+    "Lunchbox": 1.0,
+    "Premium shawls": 1.0,
+    "Eri silk shawls": 1.0,
+    "Cotton scarf": 1.0,
+    "Other scarves and shawls": 1.0,
     "Cushion covers": 1.0,
     "Coasters & placements": 1.0,
     "Towels": 1.0,
@@ -222,20 +248,40 @@ def read_overview() -> Dict[str, Dict[str, float]]:
     return data
 
 
-def read_prices(csv_path: Path) -> List[float]:
+def read_prices(csv_path: Path, category: str | None = None) -> List[float]:
+    """Return cleaned competitor prices from a CSV file.
+
+    The files scraped for competitor pricing often include unrelated
+    products. When ``category`` is provided, rows whose product name does
+    not contain any of the configured keywords for that category are
+    discarded before the price cleaning step.
+    """
+
     prices = []
+    keywords: List[str] | None = None
+    if category:
+        words = CATEGORY_KEYWORDS.get(category)
+        if words:
+            keywords = [w.lower() for w in words]
+
     with open(csv_path, newline="", encoding="cp1252") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            price = row.get("price") or row.get("Price")
-            if price:
-                price = price.replace("€", "").replace(",", "").strip()
-                try:
-                    value = float(price)
-                except ValueError:
+            if keywords:
+                name_field = (row.get("product_name") or "").lower()
+                if not any(k in name_field for k in keywords):
                     continue
-                if 0 < value < 10000:
-                    prices.append(value)
+
+            price = row.get("price") or row.get("Price")
+            if not price:
+                continue
+            price = price.replace("€", "").replace(",", "").strip()
+            try:
+                value = float(price)
+            except ValueError:
+                continue
+            if 0 < value < 10000:
+                prices.append(value)
     return clean_prices(prices)
 
 
@@ -319,11 +365,20 @@ def call_llm(prompt: str) -> float:
     raise RuntimeError("No LLM API available")
 
 
-def simulate_profit(price: float, unit_cost: float, avg_competitor: float, demand_base: float = 100.0, elasticity: float = 1.2) -> float:
-    """Simple demand model to estimate profit for backtesting."""
+def simulate_profit(
+    price: float,
+    unit_cost: float,
+    avg_competitor: float,
+    demand_base: float = 100.0,
+    elasticity: float = 1.2,
+    saturation: float = 1.0,
+) -> float:
+    """Estimate profit using a logistic demand model."""
     if price <= 0:
         return 0.0
-    demand = demand_base * (avg_competitor / price) ** elasticity
+
+    relative_price = price / max(avg_competitor, 0.01)
+    demand = demand_base * saturation / (1 + relative_price ** elasticity)
     return demand * (price - unit_cost)
 
 
@@ -377,6 +432,7 @@ def suggest_price(
             max_markup=max_markup,
             max_increase=max_increase,
             max_decrease=max_decrease,
+            saturation=DEMAND_SATURATION.get(category, 1.0),
             mean_cap_ratio=compute_mean_cap(avg, stdev),
         )
     else:
@@ -402,7 +458,7 @@ def main():
             if not info:
                 continue
             category = categorize_product(name)
-            prices = read_prices(data_file)
+            prices = read_prices(data_file, category=category)
             price = suggest_price(
                 name,
                 category,
@@ -416,8 +472,19 @@ def main():
             min_p = min(prices) if prices else info["current_price"]
             max_p = max(prices) if prices else info["current_price"]
 
-            profit_cur = simulate_profit(info["current_price"], info["unit_cost"], avg)
-            profit_new = simulate_profit(price, info["unit_cost"], avg)
+            saturation = DEMAND_SATURATION.get(category, 1.0)
+            profit_cur = simulate_profit(
+                info["current_price"],
+                info["unit_cost"],
+                avg,
+                saturation=saturation,
+            )
+            profit_new = simulate_profit(
+                price,
+                info["unit_cost"],
+                avg,
+                saturation=saturation,
+            )
 
             total_current += profit_cur
             total_recommended += profit_new

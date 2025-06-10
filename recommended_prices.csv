@@ -1,13 +1,13 @@
-Product Name,Product ID,Recommended Price,Category
-Reiek Peak Wooden Sunglasses (Incl. cork casing),SG0001,60.85,Sunglasses
-Fibonacci Wooden Sunglasses (Incl. cork casing),SG0002,64.58,Sunglasses
-Elephant Falls Thermos Bottle,BT0005,39.83,Bottles
-Saint Elias Thermos bottles,BT0012-13,39.83,Bottles
-Inca Trail Coffee Mugs,BT0015-16,41.33,Other scarves and shawls
-Woodland Mouse Phone Stand,PS0007,36.87,Phone accessories
-Tiger Trail Notebooks,NB0011-12,35.60,Notebook
-Papillon Notebooks,NB0013-15,35.60,Notebook
-Jim Corbett Lunchbox Band 1200ML,LB0017,46.09,Lunchbox
-Jim Corbett Lunchbox Band 800ML,LB0019,41.04,Lunchbox
-Timeless Silk Colored Stole,SH0017-26,77.65,Other scarves and shawls
-Silk Uncut White Stole,SH0025,120.70,Other scarves and shawls
+Product Name,Product ID,Recommended Price,Category,Avg Competitor Price,Min Competitor Price,Max Competitor Price,Median Competitor Price,Std Competitor Price,Competitor Count,Profit Current,Profit Recommended,Profit Delta
+Reiek Peak Wooden Sunglasses (Incl. cork casing),SG0001,57.99,Sunglasses,57.95,57.95,57.95,57.95,0.00,0,2186.00,2187.09,1.09
+Fibonacci Wooden Sunglasses (Incl. cork casing),SG0002,61.49,Sunglasses,61.50,61.50,61.50,61.50,0.00,0,2363.50,2363.23,-0.27
+Elephant Falls Thermos Bottle,BT0005,37.99,Bottles,29.48,10.99,49.99,37.49,14.93,17,1123.65,1258.76,135.11
+Saint Elias Thermos bottles,BT0012-13,37.99,Bottles,29.48,10.99,49.99,37.49,14.93,17,1103.30,1217.58,114.28
+Inca Trail Coffee Mugs,BT0015-16,31.99,Other scarves and shawls,31.95,31.95,31.95,31.95,0.00,0,1170.00,1171.12,1.12
+Woodland Mouse Phone Stand,PS0007,24.49,Phone accessories,46.70,18.99,90.00,43.47,23.19,14,1190.61,1470.32,279.71
+Tiger Trail Notebooks,NB0011-12,33.49,Notebook,43.74,6.99,152.00,10.99,62.08,8,1248.68,1547.11,298.43
+Papillon Notebooks,NB0013-15,30.99,Notebook,43.74,6.99,152.00,10.99,62.08,8,1261.63,1551.82,290.19
+Jim Corbett Lunchbox Band 1200ML,LB0017,42.49,Lunchbox,39.74,25.99,54.99,38.99,11.90,4,750.57,1105.78,355.21
+Jim Corbett Lunchbox Band 800ML,LB0019,39.99,Lunchbox,39.74,25.99,54.99,38.99,11.90,4,1341.89,1613.90,272.02
+Timeless Silk Colored Stole,SH0017-26,55.49,Other scarves and shawls,29.49,10.00,59.99,26.24,12.87,42,858.69,510.60,-348.10
+Silk Uncut White Stole,SH0025,85.99,Other scarves and shawls,36.15,11.25,79.99,29.99,18.99,47,1618.03,1359.85,-258.18
