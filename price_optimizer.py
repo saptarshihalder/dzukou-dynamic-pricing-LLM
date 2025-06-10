@@ -5,7 +5,6 @@ import re
 from pathlib import Path
 from typing import List, Dict
 
-
 PRICE_STEP = 0.25  # granularity for optimizer
 
 
