@@ -1,9 +1,9 @@
 import csv
-import statistics
 import os
 import re
+import statistics
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 
 PRICE_STEP = 0.25  # granularity for optimizer
 
