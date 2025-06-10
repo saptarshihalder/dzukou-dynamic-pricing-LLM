@@ -33,32 +33,39 @@ def optimize_price(
     price_step: float = PRICE_STEP,
     demand_base: float = 100.0,
 ) -> float:
-    """Search for a price that maximizes estimated profit."""
+    """Search for a price that maximizes estimated profit.
+
+    This optimizer explores prices both above and below the current price
+    (down to the minimal profitable price) and returns the price yielding the
+    highest simulated profit.
+    """
     base = unit_cost * (1 + margin)
+
     if not prices:
-        return round_price(max(base, current_price))
+        avg = current_price
+        competitor_high = current_price
+    else:
+        avg = statistics.mean(prices)
+        competitor_high = max(prices)
 
-    avg = statistics.mean(prices)
-    min_p = min(prices)
-    max_p = max(prices)
-
-    low = max(base, min_p * 0.9, current_price * 0.9)
-    high = min(avg * max_markup, max_p * 1.2, current_price * max_markup, base * max_markup)
+    # explore from the minimal acceptable price up to a generous markup
+    low = base
+    high = max(current_price, competitor_high, avg, base) * max_markup
     if high < low:
-        high = low * 1.1
+        high = low * 1.5
 
-    best_p = base
+    best_price = base
     best_profit = -1e9
     price = low
     while price <= high:
         profit = simulate_profit(price, unit_cost, avg, demand_base, elasticity)
         if profit > best_profit:
             best_profit = profit
-            best_p = price
+            best_price = price
         price += price_step
 
-    best_p = max(best_p, base)
-    return round_price(best_p)
+    best_price = max(best_price, base)
+    return round_price(best_price)
 
 
 try:
