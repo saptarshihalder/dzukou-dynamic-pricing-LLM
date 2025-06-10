@@ -10,9 +10,14 @@ from typing import Dict, List
 
 PRICE_STEP = 0.25  # granularity for optimizer
 
-# Maximum ratio of recommended price to average competitor price to keep
-# suggestions within a competitive range.
-MAX_ABOVE_MEAN = 1.3
+# Cap ratio relative to the mean competitor price. This is calculated
+# dynamically from competitor price dispersion rather than being a fixed
+# constant so recommendations remain competitive across diverse markets.
+def compute_mean_cap(avg: float, stdev: float, max_cap: float = 1.3) -> float:
+    """Return a limit for how far above the mean a price may go."""
+    if avg <= 0:
+        return max_cap
+    return min(1.0 + stdev / avg, max_cap)
 
 
 def clean_prices(prices: List[float]) -> List[float]:
@@ -38,25 +43,33 @@ def optimize_price(
     max_decrease: float = 0.25,
     price_step: float = PRICE_STEP,
     demand_base: float = 100.0,
-    mean_cap_ratio: float = MAX_ABOVE_MEAN,
+    mean_cap_ratio: float | None = None,
 ) -> float:
     """Search for a price that maximizes estimated profit.
 
     The optimizer explores prices above and below the current price while
     respecting limits on how far the new price may deviate from the
-    competitor average and the current price. It returns the price yielding
-    the highest simulated profit within these boundaries.
+    competitor average and the current price. ``mean_cap_ratio`` controls the
+    maximum allowed ratio relative to the competitor mean; if ``None`` it is
+    computed from the price dispersion to adapt dynamically. The function
+    returns the price yielding the highest simulated profit within these
+    boundaries.
     """
     base = unit_cost * (1 + margin)
 
     if not prices:
         avg = current_price
+        stdev = 0.0
         competitor_high = current_price
         competitor_low = current_price
     else:
         avg = statistics.mean(prices)
+        stdev = statistics.stdev(prices) if len(prices) > 1 else 0.0
         competitor_high = max(prices)
         competitor_low = min(prices)
+
+    if mean_cap_ratio is None:
+        mean_cap_ratio = compute_mean_cap(avg, stdev)
 
     # explore from the minimal acceptable price up to a generous markup,
     # while respecting caps relative to the current price and competitor mean
@@ -366,14 +379,14 @@ def suggest_price(
             max_markup=max_markup,
             max_increase=max_increase,
             max_decrease=max_decrease,
-            mean_cap_ratio=MAX_ABOVE_MEAN,
+            mean_cap_ratio=compute_mean_cap(avg, stdev),
         )
     else:
         base = unit * (1 + margin)
         price = max(price, base)
         price = min(price, cur * (1 + max_increase))
         price = max(price, cur * (1 - max_decrease))
-        price = min(price, avg * MAX_ABOVE_MEAN)
+        price = min(price, avg * compute_mean_cap(avg, stdev))
     return round_price(price)
 
 
