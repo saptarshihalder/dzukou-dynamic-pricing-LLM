@@ -10,10 +10,19 @@ from typing import Dict, List
 
 PRICE_STEP = 0.25  # granularity for optimizer
 
+# Cap ratio relative to the mean competitor price. This is calculated
+# dynamically from competitor price dispersion rather than being a fixed
+# constant so recommendations remain competitive across diverse markets.
+def compute_mean_cap(avg: float, stdev: float, max_cap: float = 1.3) -> float:
+    """Return a limit for how far above the mean a price may go."""
+    if avg <= 0:
+        return max_cap
+    return min(1.0 + stdev / avg, max_cap)
+
 
 def clean_prices(prices: List[float]) -> List[float]:
     """Remove outliers and invalid data from scraped prices."""
-    valid = [p for p in prices if 0 < p < 1000]
+    valid = [p for p in prices if 0 < p < 10000]
     if len(valid) >= 4:
         q1, q3 = statistics.quantiles(valid, n=4)[0], statistics.quantiles(valid, n=4)[2]
         iqr = q3 - q1
@@ -30,29 +39,45 @@ def optimize_price(
     margin: float,
     elasticity: float = 1.2,
     max_markup: float = 1.8,
+    max_increase: float = 0.30,
+    max_decrease: float = 0.25,
     price_step: float = PRICE_STEP,
     demand_base: float = 100.0,
+    mean_cap_ratio: float | None = None,
 ) -> float:
     """Search for a price that maximizes estimated profit.
 
-    This optimizer explores prices both above and below the current price
-    (down to the minimal profitable price) and returns the price yielding the
-    highest simulated profit.
+    The optimizer explores prices above and below the current price while
+    respecting limits on how far the new price may deviate from the
+    competitor average and the current price. ``mean_cap_ratio`` controls the
+    maximum allowed ratio relative to the competitor mean; if ``None`` it is
+    computed from the price dispersion to adapt dynamically. The function
+    returns the price yielding the highest simulated profit within these
+    boundaries.
     """
     base = unit_cost * (1 + margin)
 
     if not prices:
         avg = current_price
+        stdev = 0.0
         competitor_high = current_price
+        competitor_low = current_price
     else:
         avg = statistics.mean(prices)
+        stdev = statistics.stdev(prices) if len(prices) > 1 else 0.0
         competitor_high = max(prices)
+        competitor_low = min(prices)
 
-    # explore from the minimal acceptable price up to a generous markup
-    low = base
+    if mean_cap_ratio is None:
+        mean_cap_ratio = compute_mean_cap(avg, stdev)
+
+    # explore from the minimal acceptable price up to a generous markup,
+    # while respecting caps relative to the current price and competitor mean
+    low = max(base, competitor_low, current_price * (1 - max_decrease))
     high = max(current_price, competitor_high, avg, base) * max_markup
+    high = min(high, current_price * (1 + max_increase), avg * mean_cap_ratio)
     if high < low:
-        high = low * 1.5
+        high = low
 
     best_price = base
     best_profit = -1e9
@@ -125,6 +150,40 @@ MAX_MARKUP = {
     "Towels": 1.5,
 }
 
+# Maximum allowed price increase relative to the current price
+MAX_INCREASE = {
+    "default": 0.30,
+    "Sunglasses": 0.30,
+    "Bottles": 0.30,
+    "Phone accessories": 0.30,
+    "Notebook": 0.30,
+    "Lunchbox": 0.30,
+    "Premium shawls": 0.30,
+    "Eri silk shawls": 0.30,
+    "Cotton scarf": 0.30,
+    "Other scarves and shawls": 0.30,
+    "Cushion covers": 0.30,
+    "Coasters & placements": 0.30,
+    "Towels": 0.30,
+}
+
+# Maximum allowed price decrease relative to the current price
+MAX_DECREASE = {
+    "default": 0.25,
+    "Sunglasses": 0.25,
+    "Bottles": 0.25,
+    "Phone accessories": 0.25,
+    "Notebook": 0.25,
+    "Lunchbox": 0.25,
+    "Premium shawls": 0.25,
+    "Eri silk shawls": 0.25,
+    "Cotton scarf": 0.25,
+    "Other scarves and shawls": 0.25,
+    "Cushion covers": 0.25,
+    "Coasters & placements": 0.25,
+    "Towels": 0.25,
+}
+
 
 def round_price(price: float) -> float:
     """Round price to a corporate-friendly format (e.g., 0.99)."""
@@ -177,7 +236,7 @@ def read_prices(csv_path: Path) -> List[float]:
                     value = float(price)
                 except ValueError:
                     continue
-                if 0 < value < 1000:
+                if 0 < value < 10000:
                     prices.append(value)
     return clean_prices(prices)
 
@@ -282,6 +341,8 @@ def suggest_price(
     margin = PROFIT_MARGINS.get(category, 0.15)
     elasticity = DEMAND_ELASTICITY.get(category, 1.2)
     max_markup = MAX_MARKUP.get(category, 1.8)
+    max_increase = MAX_INCREASE.get(category, MAX_INCREASE["default"])
+    max_decrease = MAX_DECREASE.get(category, MAX_DECREASE["default"])
 
     if not prices:
         return round_price(max(unit * (1 + margin), cur))
@@ -316,7 +377,16 @@ def suggest_price(
             margin,
             elasticity=elasticity,
             max_markup=max_markup,
+            max_increase=max_increase,
+            max_decrease=max_decrease,
+            mean_cap_ratio=compute_mean_cap(avg, stdev),
         )
+    else:
+        base = unit * (1 + margin)
+        price = max(price, base)
+        price = min(price, cur * (1 + max_increase))
+        price = max(price, cur * (1 - max_decrease))
+        price = min(price, avg * compute_mean_cap(avg, stdev))
     return round_price(price)
 
 
