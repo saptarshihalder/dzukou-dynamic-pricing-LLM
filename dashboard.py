@@ -24,25 +24,54 @@ def load_data():
 
 
 def build_dashboard(df, out_path=OUT_HTML):
-    fig = px.bar(
+    """Generate an HTML dashboard with interactive charts."""
+    fig_delta = px.bar(
         df,
         x="Product Name",
         y="Profit Delta",
+        color="Profit Delta",
+        color_continuous_scale="RdYlGn",
         title="Profit Delta by Product",
     )
-    fig.update_layout(xaxis_title="Product", yaxis_title="Profit Delta (€)", xaxis_tickangle=-45)
-    html = """
+    fig_delta.update_layout(
+        xaxis_title="Product",
+        yaxis_title="Profit Delta (€)",
+        xaxis_tickangle=-45,
+    )
+
+    fig_price = px.bar(
+        df,
+        x="Product Name",
+        y=["Current Price", "Recommended Price"],
+        barmode="group",
+        title="Current vs Recommended Prices",
+    )
+    fig_price.update_layout(
+        xaxis_title="Product",
+        yaxis_title="Price (€)",
+        xaxis_tickangle=-45,
+    )
+
+    html = f"""
 <html>
 <head>
-<meta charset='utf-8'>
-<title>Dzukou Pricing Dashboard</title>
+    <meta charset='utf-8'>
+    <title>Dzukou Pricing Dashboard</title>
+    <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css'>
+    <style>
+        body {{ padding: 20px; font-family: Arial, sans-serif; }}
+        h1 {{ margin-bottom: 30px; }}
+    </style>
 </head>
 <body>
-<h1>Dzukou Pricing Dashboard</h1>
+    <h1>Dzukou Pricing Dashboard</h1>
+    {fig_delta.to_html(full_html=False, include_plotlyjs='cdn')}
+    {fig_price.to_html(full_html=False, include_plotlyjs=False)}
+    <h2 class='mt-4'>Detailed Data</h2>
+    {df.to_html(index=False, classes='table table-striped', float_format=lambda x: f'{x:.2f}')}
+</body>
+</html>
 """
-    html += fig.to_html(full_html=False, include_plotlyjs="cdn")
-    html += df.to_html(index=False, float_format=lambda x: f"{x:.2f}")
-    html += "</body></html>"
     Path(out_path).write_text(html, encoding="utf-8")
     print(f"Dashboard saved to {out_path}")
 
