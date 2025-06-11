@@ -8,10 +8,24 @@ OUT_HTML = "dashboard.html"
 
 
 def load_data():
+    """Load overview and recommendation data and compute deltas."""
     overview = pd.read_csv(OVERVIEW_CSV, encoding="cp1252")
     recommended = pd.read_csv(RECOMMENDED_CSV)
-    overview["Current Price"] = overview[" Current Price "].str.replace("€", "").astype(float)
-    overview["Unit Cost"] = overview[" Unit Cost "].str.replace("€", "").astype(float)
+
+    # Trim whitespace from column names and key fields so merges work
+    overview = overview.rename(columns=lambda c: c.strip())
+    recommended = recommended.rename(columns=lambda c: c.strip())
+    for df in (overview, recommended):
+        df["Product Name"] = df["Product Name"].str.strip()
+        df["Product ID"] = df["Product ID"].astype(str).str.strip()
+
+    overview["Current Price"] = (
+        overview["Current Price"].astype(str).str.replace("€", "").astype(float)
+    )
+    overview["Unit Cost"] = (
+        overview["Unit Cost"].astype(str).str.replace("€", "").astype(float)
+    )
+
     df = recommended.merge(
         overview[["Product Name", "Product ID", "Current Price", "Unit Cost"]],
         on=["Product Name", "Product ID"],
