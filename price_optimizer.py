@@ -112,6 +112,7 @@ MAPPING_CSV = "product_data_mapping.csv"
 PROFIT_MARGINS = {
     "Sunglasses": 0.15,
     "Bottles": 0.10,
+    "Coffee mugs": 0.10,
     "Phone accessories": 0.10,
     "Notebook": 0.10,
     "Lunchbox": 0.10,
@@ -128,6 +129,7 @@ PROFIT_MARGINS = {
 DEMAND_ELASTICITY = {
     "Sunglasses": 1.3,
     "Bottles": 1.1,
+    "Coffee mugs": 1.1,
     "Phone accessories": 1.2,
     "Notebook": 1.0,
     "Lunchbox": 1.0,
@@ -146,6 +148,7 @@ DEMAND_ELASTICITY = {
 DEMAND_SATURATION = {
     "Sunglasses": 1.0,
     "Bottles": 1.0,
+    "Coffee mugs": 1.0,
     "Phone accessories": 1.0,
     "Notebook": 1.0,
     "Lunchbox": 1.0,
@@ -162,6 +165,7 @@ DEMAND_SATURATION = {
 MAX_MARKUP = {
     "Sunglasses": 1.8,
     "Bottles": 1.6,
+    "Coffee mugs": 1.6,
     "Phone accessories": 1.5,
     "Notebook": 1.5,
     "Lunchbox": 1.6,
@@ -179,6 +183,7 @@ MAX_INCREASE = {
     "default": 0.30,
     "Sunglasses": 0.30,
     "Bottles": 0.30,
+    "Coffee mugs": 0.30,
     "Phone accessories": 0.30,
     "Notebook": 0.30,
     "Lunchbox": 0.30,
@@ -196,6 +201,7 @@ MAX_DECREASE = {
     "default": 0.25,
     "Sunglasses": 0.25,
     "Bottles": 0.25,
+    "Coffee mugs": 0.25,
     "Phone accessories": 0.25,
     "Notebook": 0.25,
     "Lunchbox": 0.25,
@@ -216,6 +222,7 @@ def round_price(price: float) -> float:
 CATEGORY_KEYWORDS = {
     "Sunglasses": ["sunglasses"],
     "Bottles": ["bottle"],
+    "Coffee mugs": ["mug"],
     "Phone accessories": ["phone"],
     "Notebook": ["notebook"],
     "Lunchbox": ["lunchbox"],
@@ -269,7 +276,8 @@ def read_prices(csv_path: Path, category: str | None = None) -> List[float]:
         for row in reader:
             if keywords:
                 name_field = (row.get("product_name") or "").lower()
-                if not any(k in name_field for k in keywords):
+                term_field = (row.get("search_term") or "").lower()
+                if not any(k in name_field or k in term_field for k in keywords):
                     continue
 
             price = row.get("price") or row.get("Price")
