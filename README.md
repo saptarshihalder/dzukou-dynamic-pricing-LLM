@@ -12,6 +12,14 @@ Install dependencies with:
 pip install pandas plotly requests
 ```
 
+### Adding products
+Use `manage_products.py` to register a new item and its keywords. This will
+create an empty CSV file for scraped data and update `category_keywords.json`.
+
+```bash
+python3 manage_products.py "Awesome Mug" AM0001 "Coffee mugs" --keywords "mug,cup"
+```
+
 ## Usage
 1. Ensure the mapping file `product_data_mapping.csv` and overview file `Dzukou_Pricing_Overview_With_Names - Copy.csv` are present in the repository.
 2. Run the optimizer to generate `recommended_prices.csv`:

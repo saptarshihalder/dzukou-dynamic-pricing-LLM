@@ -5,6 +5,7 @@ import csv
 import os
 import re
 import statistics
+import json
 from pathlib import Path
 from typing import Dict, List
 
@@ -219,7 +220,11 @@ def round_price(price: float) -> float:
     """Round price to a corporate-friendly format (e.g., 0.99)."""
     return round(price * 2) / 2 - 0.01
 
-CATEGORY_KEYWORDS = {
+# Default keywords used if no external mapping file is present. The
+# mapping associates categories with words that identify products in that
+# category. ``manage_products.py`` can update ``category_keywords.json`` to
+# customize this mapping.
+DEFAULT_CATEGORY_KEYWORDS = {
     "Sunglasses": ["sunglasses"],
     "Bottles": ["bottle"],
     "Coffee mugs": ["mug"],
@@ -231,6 +236,25 @@ CATEGORY_KEYWORDS = {
     "Cotton scarf": ["cotton scarf"],
     "Other scarves and shawls": ["stole", "shawl", "scarf"],
 }
+
+KEYWORDS_JSON = "category_keywords.json"
+
+
+def load_category_keywords() -> Dict[str, List[str]]:
+    """Return category keywords loaded from ``KEYWORDS_JSON`` if present."""
+    path = Path(KEYWORDS_JSON)
+    if path.exists():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return {k: list(map(str, v)) for k, v in data.items()}
+        except Exception:
+            pass
+    return DEFAULT_CATEGORY_KEYWORDS
+
+
+CATEGORY_KEYWORDS = load_category_keywords()
 
 
 def categorize_product(name: str) -> str:
