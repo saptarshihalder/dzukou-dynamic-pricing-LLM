@@ -13,11 +13,12 @@ pip install pandas plotly requests
 ```
 
 ### Adding products
-Use `manage_products.py` to register a new item and its keywords. This will
-create an empty CSV file for scraped data and update `category_keywords.json`.
+Run `manage_products.py` to open a small GUI for adding items and category
+keywords. The tool will create an empty CSV file for scraped data and update
+`category_keywords.json`.
 
 ```bash
-python3 manage_products.py "Awesome Mug" AM0001 "Coffee mugs" --keywords "mug,cup"
+python3 manage_products.py
 ```
 
 ## Usage
