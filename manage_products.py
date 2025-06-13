@@ -130,6 +130,8 @@ class ProductManagerGUI:
                 with open(MAPPING_CSV, newline="") as f:
                     mapping = list(csv.DictReader(f))
 
+            # Use a single CSV per category so competitor data is grouped
+            # regardless of product names
             file_name = self.sanitize_filename(category)
             data_file = DATA_DIR / file_name
             if not data_file.exists():
