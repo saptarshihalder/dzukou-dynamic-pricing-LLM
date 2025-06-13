@@ -9,6 +9,7 @@ from pathlib import Path
 
 MAPPING_CSV = "product_data_mapping.csv"
 KEYWORDS_JSON = "category_keywords.json"
+OVERVIEW_CSV = "Dzukou_Pricing_Overview_With_Names - Copy.csv"
 DATA_DIR = Path("product_data")
 
 
@@ -43,9 +44,17 @@ class ProductManagerGUI:
         self.category_entry = ttk.Entry(main_frame, width=40)
         self.category_entry.grid(row=3, column=1, sticky=(tk.W, tk.E), pady=5)
 
-        ttk.Label(main_frame, text="Keywords:").grid(row=4, column=0, sticky=(tk.W, tk.N), pady=5)
+        ttk.Label(main_frame, text="Current Price:").grid(row=4, column=0, sticky=tk.W, pady=5)
+        self.price_entry = ttk.Entry(main_frame, width=40)
+        self.price_entry.grid(row=4, column=1, sticky=(tk.W, tk.E), pady=5)
+
+        ttk.Label(main_frame, text="Unit Cost:").grid(row=5, column=0, sticky=tk.W, pady=5)
+        self.cost_entry = ttk.Entry(main_frame, width=40)
+        self.cost_entry.grid(row=5, column=1, sticky=(tk.W, tk.E), pady=5)
+
+        ttk.Label(main_frame, text="Keywords:").grid(row=6, column=0, sticky=(tk.W, tk.N), pady=5)
         keywords_frame = ttk.Frame(main_frame)
-        keywords_frame.grid(row=4, column=1, sticky=(tk.W, tk.E), pady=5)
+        keywords_frame.grid(row=6, column=1, sticky=(tk.W, tk.E), pady=5)
 
         self.keywords_entry = ttk.Entry(keywords_frame, width=40)
         self.keywords_entry.grid(row=0, column=0, sticky=(tk.W, tk.E))
@@ -54,13 +63,13 @@ class ProductManagerGUI:
         keywords_frame.columnconfigure(0, weight=1)
 
         self.add_button = ttk.Button(main_frame, text="Add Product", command=self.add_product)
-        self.add_button.grid(row=5, column=0, columnspan=2, pady=20)
+        self.add_button.grid(row=7, column=0, columnspan=2, pady=20)
 
-        ttk.Label(main_frame, text="Output:").grid(row=6, column=0, sticky=(tk.W, tk.N), pady=5)
+        ttk.Label(main_frame, text="Output:").grid(row=8, column=0, sticky=(tk.W, tk.N), pady=5)
         self.output_text = scrolledtext.ScrolledText(main_frame, height=8, width=50)
-        self.output_text.grid(row=6, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        self.output_text.grid(row=8, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
 
-        main_frame.rowconfigure(6, weight=1)
+        main_frame.rowconfigure(8, weight=1)
 
         self.status_var = tk.StringVar()
         self.status_var.set("Ready to add products")
@@ -87,6 +96,8 @@ class ProductManagerGUI:
         name = self.name_entry.get().strip()
         prod_id = self.id_entry.get().strip()
         category = self.category_entry.get().strip()
+        price_str = self.price_entry.get().strip()
+        cost_str = self.cost_entry.get().strip()
         keywords_str = self.keywords_entry.get().strip()
 
         if not name:
@@ -97,6 +108,16 @@ class ProductManagerGUI:
             return
         if not category:
             messagebox.showerror("Error", "Category is required")
+            return
+        if not price_str or not cost_str:
+            messagebox.showerror("Error", "Price and unit cost are required")
+            return
+
+        try:
+            price_val = float(price_str)
+            cost_val = float(cost_str)
+        except ValueError:
+            messagebox.showerror("Error", "Price and cost must be numbers")
             return
 
         keywords = [k.strip() for k in keywords_str.split(",") if k.strip()]
@@ -109,7 +130,7 @@ class ProductManagerGUI:
                 with open(MAPPING_CSV, newline="") as f:
                     mapping = list(csv.DictReader(f))
 
-            file_name = self.sanitize_filename(name)
+            file_name = self.sanitize_filename(category)
             data_file = DATA_DIR / file_name
             if not data_file.exists():
                 data_file.write_text("category,store,product_name,price,search_term,store_url\n")
@@ -120,6 +141,27 @@ class ProductManagerGUI:
                 writer = csv.DictWriter(f, fieldnames=["Product Name", "Product ID", "Data File"])
                 writer.writeheader()
                 writer.writerows(mapping)
+
+            # update overview csv
+            overview_rows = []
+            if Path(OVERVIEW_CSV).exists():
+                with open(OVERVIEW_CSV, newline="", encoding="cp1252") as f:
+                    overview_rows = list(csv.DictReader(f))
+
+            overview_rows.append({
+                "Product Name": name,
+                "Product ID": prod_id,
+                " Current Price ": f"{price_val}",
+                " Unit Cost ": f"{cost_val}"
+            })
+
+            with open(OVERVIEW_CSV, "w", newline="", encoding="cp1252") as f:
+                writer = csv.DictWriter(
+                    f,
+                    fieldnames=["Product Name", "Product ID", " Current Price ", " Unit Cost "],
+                )
+                writer.writeheader()
+                writer.writerows(overview_rows)
 
             kw_data = self.load_keywords()
             kws = kw_data.setdefault(category, [])
@@ -139,6 +181,8 @@ class ProductManagerGUI:
             self.name_entry.delete(0, tk.END)
             self.id_entry.delete(0, tk.END)
             self.category_entry.delete(0, tk.END)
+            self.price_entry.delete(0, tk.END)
+            self.cost_entry.delete(0, tk.END)
             self.keywords_entry.delete(0, tk.END)
 
             self.status_var.set(f"Successfully added product: {name}")
