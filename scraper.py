@@ -19,9 +19,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-MAPPING_CSV = "product_data_mapping.csv"
-KEYWORDS_JSON = "category_keywords.json"
-DATA_DIR = Path("product_data")
+BASE_DIR = Path(__file__).resolve().parent
+MAPPING_CSV = BASE_DIR / "product_data_mapping.csv"
+KEYWORDS_JSON = BASE_DIR / "category_keywords.json"
+DATA_DIR = BASE_DIR / "product_data"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -187,12 +188,12 @@ class ProductScraper:
         self.product_categories = self.load_categories()
 
         self.csv_dir = DATA_DIR
-        os.makedirs(self.csv_dir, exist_ok=True)
+        self.csv_dir.mkdir(exist_ok=True)
         self.results_by_category = {cat: [] for cat in self.product_categories}
 
     def load_categories(self):
         data = DEFAULT_CATEGORIES.copy()
-        if Path(KEYWORDS_JSON).exists():
+        if KEYWORDS_JSON.exists():
             try:
                 with open(KEYWORDS_JSON, "r", encoding="utf-8") as f:
                     kw_data = json.load(f)
@@ -370,16 +371,16 @@ class ProductScraper:
             if products:
                 df = pd.DataFrame(products)
                 df.to_csv(path, index=False)
-                logger.info("Saved %d products to %s", len(df), path)
+                logger.info("Saved %d products to %s", len(df), str(path))
             else:
                 pd.DataFrame(columns=["category", "store", "product_name", "price", "search_term", "store_url"]).to_csv(path, index=False)
-                logger.info("Created empty file: %s", path)
+                logger.info("Created empty file: %s", str(path))
             saved.append(path)
         print("\nCategory files created:")
         for p in saved:
             count = len(pd.read_csv(p)) if p.exists() else 0
             print(f"  • {p.name}: {count} products")
-        print(f"\nAll files saved to: {self.csv_dir}/ directory")
+        print(f"\nAll files saved to: {str(self.csv_dir)}/ directory")
 
 
 def main():

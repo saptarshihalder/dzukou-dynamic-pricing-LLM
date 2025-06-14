@@ -4,9 +4,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pathlib import Path
 
-OVERVIEW_CSV = "Dzukou_Pricing_Overview_With_Names - Copy.csv"
-RECOMMENDED_CSV = "recommended_prices.csv"
-OUT_HTML = "dashboard.html"
+BASE_DIR = Path(__file__).resolve().parent
+OVERVIEW_CSV = BASE_DIR / "Dzukou_Pricing_Overview_With_Names - Copy.csv"
+RECOMMENDED_CSV = BASE_DIR / "recommended_prices.csv"
+OUT_HTML = BASE_DIR / "dashboard.html"
 
 
 def load_data():
@@ -192,7 +193,7 @@ def build_dashboard(df, out_path=OUT_HTML):
 </html>
 """
     Path(out_path).write_text(html, encoding="utf-8")
-    print(f"Dashboard saved to {out_path}")
+    print(f"Dashboard saved to {str(out_path)}")
 
 
 def main():

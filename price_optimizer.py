@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import Dict, List
 
+BASE_DIR = Path(__file__).resolve().parent
+
 PRICE_STEP = 0.25  # granularity for optimizer
 
 # Cap ratio relative to the mean competitor price. This is calculated
@@ -106,8 +108,8 @@ except ImportError:  # requests might not be installed; LLM calls become optiona
     requests = None
 
 
-OVERVIEW_CSV = "Dzukou_Pricing_Overview_With_Names - Copy.csv"
-MAPPING_CSV = "product_data_mapping.csv"
+OVERVIEW_CSV = BASE_DIR / "Dzukou_Pricing_Overview_With_Names - Copy.csv"
+MAPPING_CSV = BASE_DIR / "product_data_mapping.csv"
 
 # Minimum profit margins by category
 PROFIT_MARGINS = {
@@ -237,12 +239,12 @@ DEFAULT_CATEGORY_KEYWORDS = {
     "Other scarves and shawls": ["stole", "shawl", "scarf"],
 }
 
-KEYWORDS_JSON = "category_keywords.json"
+KEYWORDS_JSON = BASE_DIR / "category_keywords.json"
 
 
 def load_category_keywords() -> Dict[str, List[str]]:
     """Return category keywords loaded from ``KEYWORDS_JSON`` if present."""
-    path = Path(KEYWORDS_JSON)
+    path = KEYWORDS_JSON
     if path.exists():
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -536,7 +538,7 @@ def main():
                 "Profit Recommended": f"{profit_new:.2f}",
                 "Profit Delta": f"{(profit_new - profit_cur):.2f}",
             })
-    out_path = Path("recommended_prices.csv")
+    out_path = BASE_DIR / "recommended_prices.csv"
     with open(out_path, "w", newline="") as f:
         writer = csv.DictWriter(
             f,
@@ -558,7 +560,7 @@ def main():
         )
         writer.writeheader()
         writer.writerows(results)
-    print(f"Saved {len(results)} recommendations to {out_path}")
+    print(f"Saved {len(results)} recommendations to {str(out_path)}")
     print(
         f"Total estimated profit now: {total_current:.2f} -> {total_recommended:.2f} (delta {(total_recommended-total_current):.2f})"
     )

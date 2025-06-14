@@ -9,10 +9,11 @@ from pathlib import Path
 
 from scraper import DEFAULT_CATEGORIES
 
-MAPPING_CSV = "product_data_mapping.csv"
-KEYWORDS_JSON = "category_keywords.json"
-OVERVIEW_CSV = "Dzukou_Pricing_Overview_With_Names - Copy.csv"
-DATA_DIR = Path("product_data")
+BASE_DIR = Path(__file__).resolve().parent
+MAPPING_CSV = BASE_DIR / "product_data_mapping.csv"
+KEYWORDS_JSON = BASE_DIR / "category_keywords.json"
+OVERVIEW_CSV = BASE_DIR / "Dzukou_Pricing_Overview_With_Names - Copy.csv"
+DATA_DIR = BASE_DIR / "product_data"
 
 
 class ProductManagerGUI:
@@ -96,7 +97,7 @@ class ProductManagerGUI:
         return base + ".csv"
 
     def load_keywords(self) -> dict:
-        if Path(KEYWORDS_JSON).exists():
+        if KEYWORDS_JSON.exists():
             with open(KEYWORDS_JSON, "r", encoding="utf-8") as f:
                 return json.load(f)
         return {}
@@ -143,7 +144,7 @@ class ProductManagerGUI:
             DATA_DIR.mkdir(exist_ok=True)
 
             mapping = []
-            if Path(MAPPING_CSV).exists():
+            if MAPPING_CSV.exists():
                 with open(MAPPING_CSV, newline="") as f:
                     mapping = list(csv.DictReader(f))
 
@@ -163,7 +164,7 @@ class ProductManagerGUI:
 
             # update overview csv
             overview_rows = []
-            if Path(OVERVIEW_CSV).exists():
+            if OVERVIEW_CSV.exists():
                 with open(OVERVIEW_CSV, newline="", encoding="cp1252") as f:
                     overview_rows = list(csv.DictReader(f))
 
@@ -189,7 +190,7 @@ class ProductManagerGUI:
                     kws.append(kw)
             self.save_keywords(kw_data)
 
-            output_msg = f"Added product '{name}' with data file {data_file}\n"
+            output_msg = f"Added product '{name}' with data file {str(data_file)}\n"
             if category != category_input:
                 output_msg += f"Category mapped to existing '{category}'.\n"
             if keywords:
@@ -216,12 +217,12 @@ class ProductManagerGUI:
     def update_status(self):
         try:
             product_count = 0
-            if Path(MAPPING_CSV).exists():
+            if MAPPING_CSV.exists():
                 with open(MAPPING_CSV, newline="") as f:
                     product_count = len(list(csv.DictReader(f)))
 
             category_count = 0
-            if Path(KEYWORDS_JSON).exists():
+            if KEYWORDS_JSON.exists():
                 kw_data = self.load_keywords()
                 category_count = len(kw_data)
 
