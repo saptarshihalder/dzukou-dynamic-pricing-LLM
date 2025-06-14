@@ -336,6 +336,11 @@ class ProductScraper:
         logger.info("Starting product scraping...")
         for category, info in self.product_categories.items():
             terms = info["search_terms"]
+            if not terms:
+                logger.warning(
+                    "No search terms for category '%s', skipping", category
+                )
+                continue
             for store_name, store_cfg in self.stores.items():
                 logger.info("Checking %s...", store_name)
                 try:
