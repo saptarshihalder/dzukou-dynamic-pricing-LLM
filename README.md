@@ -17,6 +17,7 @@ Run `manage_products.py` to open a small GUI for adding items and category
 keywords. The tool now lets you enter the product's current price and unit
 cost. It creates an empty CSV file for scraped data, updates
 `category_keywords.json`, and appends the pricing info to the overview CSV.
+Category names are matched case-insensitively to avoid creating duplicates.
 
 ```bash
 python3 manage_products.py

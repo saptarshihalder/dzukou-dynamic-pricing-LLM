@@ -7,6 +7,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from pathlib import Path
 
+from scraper import DEFAULT_CATEGORIES
+
 MAPPING_CSV = "product_data_mapping.csv"
 KEYWORDS_JSON = "category_keywords.json"
 OVERVIEW_CSV = "Dzukou_Pricing_Overview_With_Names - Copy.csv"
@@ -78,6 +80,17 @@ class ProductManagerGUI:
 
         self.update_status()
 
+    def canonical_category(self, category: str) -> str:
+        """Return a canonical category name if it already exists."""
+        sanitized = self.sanitize_filename(category)
+        existing = list(DEFAULT_CATEGORIES.keys())
+        existing_kw = self.load_keywords().keys()
+        existing.extend(existing_kw)
+        for cat in existing:
+            if self.sanitize_filename(cat) == sanitized:
+                return cat
+        return category.strip()
+
     def sanitize_filename(self, name: str) -> str:
         base = re.sub(r"\W+", "_", name.lower()).strip("_")
         return base + ".csv"
@@ -95,7 +108,8 @@ class ProductManagerGUI:
     def add_product(self):
         name = self.name_entry.get().strip()
         prod_id = self.id_entry.get().strip()
-        category = self.category_entry.get().strip()
+        category_input = self.category_entry.get().strip()
+        category = self.canonical_category(category_input)
         price_str = self.price_entry.get().strip()
         cost_str = self.cost_entry.get().strip()
         keywords_str = self.keywords_entry.get().strip()
@@ -173,6 +187,8 @@ class ProductManagerGUI:
             self.save_keywords(kw_data)
 
             output_msg = f"Added product '{name}' with data file {data_file}\n"
+            if category != category_input:
+                output_msg += f"Category mapped to existing '{category}'.\n"
             if keywords:
                 output_msg += f"Keywords added to category '{category}': {', '.join(keywords)}\n"
             output_msg += "-" * 50 + "\n"
