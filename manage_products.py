@@ -15,6 +15,11 @@ OVERVIEW_CSV = "Dzukou_Pricing_Overview_With_Names - Copy.csv"
 DATA_DIR = Path("product_data")
 
 
+def canonical_key(name: str) -> str:
+    """Return a lowercase key with only alphanumeric characters."""
+    return re.sub(r"[^a-z0-9]+", "", name.lower())
+
+
 class ProductManagerGUI:
     def __init__(self, root):
         self.root = root
@@ -82,12 +87,11 @@ class ProductManagerGUI:
 
     def canonical_category(self, category: str) -> str:
         """Return a canonical category name if it already exists."""
-        sanitized = self.sanitize_filename(category)
+        key = canonical_key(category)
         existing = list(DEFAULT_CATEGORIES.keys())
-        existing_kw = self.load_keywords().keys()
-        existing.extend(existing_kw)
+        existing.extend(self.load_keywords().keys())
         for cat in existing:
-            if self.sanitize_filename(cat) == sanitized:
+            if canonical_key(cat) == key:
                 return cat
         return category.strip()
 
