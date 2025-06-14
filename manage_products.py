@@ -109,6 +109,9 @@ class ProductManagerGUI:
         if not category:
             messagebox.showerror("Error", "Category is required")
             return
+        if not keywords_str:
+            messagebox.showerror("Error", "At least one keyword is required")
+            return
         if not price_str or not cost_str:
             messagebox.showerror("Error", "Price and unit cost are required")
             return
