@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """Scrape competitor pricing data for each product category."""
-import csv
 import json
 import logging
-import os
 import random
 import re
 import time
@@ -18,9 +16,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from utils import canonical_key
 
 BASE_DIR = Path(__file__).resolve().parent
-MAPPING_CSV = BASE_DIR / "product_data_mapping.csv"
 KEYWORDS_JSON = BASE_DIR / "category_keywords.json"
 DATA_DIR = BASE_DIR / "product_data"
 
@@ -34,11 +32,6 @@ logger = logging.getLogger(__name__)
 def sanitize_filename(text: str) -> str:
     base = re.sub(r"\W+", "_", text.lower()).strip("_")
     return base + ".csv"
-
-
-def canonical_key(name: str) -> str:
-    """Return a lowercase key with only alphanumeric characters."""
-    return re.sub(r"[^a-z0-9]+", "", name.lower())
 
 
 DEFAULT_CATEGORIES = {
