@@ -8,19 +8,13 @@ from tkinter import ttk, messagebox, scrolledtext
 from pathlib import Path
 
 from scraper import DEFAULT_CATEGORIES
+from utils import canonical_key
 
 BASE_DIR = Path(__file__).resolve().parent
 MAPPING_CSV = BASE_DIR / "product_data_mapping.csv"
 KEYWORDS_JSON = BASE_DIR / "category_keywords.json"
 OVERVIEW_CSV = BASE_DIR / "Dzukou_Pricing_Overview_With_Names - Copy.csv"
 DATA_DIR = BASE_DIR / "product_data"
-
-
-def canonical_key(name: str) -> str:
-    """Return a lowercase key with only alphanumeric characters."""
-    return re.sub(r"[^a-z0-9]+", "", name.lower())
-
-
 class ProductManagerGUI:
     def __init__(self, root):
         self.root = root
