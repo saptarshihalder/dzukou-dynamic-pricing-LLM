@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """Scrape competitor pricing data for each product category."""
-import csv
 import json
 import logging
-import os
 import random
 import re
 import time
@@ -21,7 +19,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from utils import canonical_key
 
 BASE_DIR = Path(__file__).resolve().parent
-MAPPING_CSV = BASE_DIR / "product_data_mapping.csv"
 KEYWORDS_JSON = BASE_DIR / "category_keywords.json"
 DATA_DIR = BASE_DIR / "product_data"
 
