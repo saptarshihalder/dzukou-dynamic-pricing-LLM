@@ -6,6 +6,7 @@ import re
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from pathlib import Path
+import ast
 
 from scraper import DEFAULT_CATEGORIES
 from utils import canonical_key
@@ -15,6 +16,7 @@ MAPPING_CSV = BASE_DIR / "product_data_mapping.csv"
 KEYWORDS_JSON = BASE_DIR / "category_keywords.json"
 OVERVIEW_CSV = BASE_DIR / "Dzukou_Pricing_Overview_With_Names - Copy.csv"
 DATA_DIR = BASE_DIR / "product_data"
+SCRAPER_PY = BASE_DIR / "scraper.py"
 class ProductManagerGUI:
     def __init__(self, root):
         self.root = root
@@ -104,6 +106,63 @@ class ProductManagerGUI:
         with open(KEYWORDS_JSON, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
+    def update_scraper_categories(self, category: str, keywords: list, csv_filename: str):
+        """Update the DEFAULT_CATEGORIES in scraper.py file."""
+        try:
+            # Read the current scraper.py file
+            if not SCRAPER_PY.exists():
+                messagebox.showwarning(
+                    "Warning", "scraper.py file not found. Cannot update DEFAULT_CATEGORIES."
+                )
+                return False
+
+            with open(SCRAPER_PY, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Find the DEFAULT_CATEGORIES dictionary
+            pattern = r"DEFAULT_CATEGORIES\s*=\s*\{[\s\S]*?\n\}"
+            match = re.search(pattern, content)
+
+            if not match:
+                messagebox.showwarning(
+                    "Warning", "DEFAULT_CATEGORIES not found in scraper.py"
+                )
+                return False
+
+            # Load existing categories
+            categories = DEFAULT_CATEGORIES.copy()
+
+            # Update or add the new category
+            categories[category] = {
+                "search_terms": keywords,
+                "csv_filename": csv_filename,
+            }
+
+            # Generate the new DEFAULT_CATEGORIES string
+            new_dict_str = "DEFAULT_CATEGORIES = {\n"
+            for cat_name, cat_data in categories.items():
+                new_dict_str += f'    "{cat_name}": {{\n'
+                new_dict_str += "        \"search_terms\": [\n"
+                for term in cat_data["search_terms"]:
+                    new_dict_str += f'            "{term}",\n'
+                new_dict_str += "        ],\n"
+                new_dict_str += f'        "csv_filename": "{cat_data["csv_filename"]}",\n'
+                new_dict_str += "    },\n"
+            new_dict_str += "}"
+
+            # Replace the old dictionary with the new one
+            new_content = content[: match.start()] + new_dict_str + content[match.end() :]
+
+            # Write back to the file
+            with open(SCRAPER_PY, "w", encoding="utf-8") as f:
+                f.write(new_content)
+
+            return True
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to update scraper.py: {str(e)}")
+            return False
+
     def add_product(self):
         name = self.name_entry.get().strip()
         prod_id = self.id_entry.get().strip()
@@ -188,11 +247,16 @@ class ProductManagerGUI:
                     kws.append(kw)
             self.save_keywords(kw_data)
 
+            # Update scraper.py with the new category
+            scraper_updated = self.update_scraper_categories(category, keywords, file_name)
+
             output_msg = f"Added product '{name}' with data file {str(data_file)}\n"
             if category != category_input:
                 output_msg += f"Category mapped to existing '{category}'.\n"
             if keywords:
                 output_msg += f"Keywords added to category '{category}': {', '.join(keywords)}\n"
+            if scraper_updated:
+                output_msg += f"Updated scraper.py with category '{category}'\n"
             output_msg += "-" * 50 + "\n"
 
             self.output_text.insert(tk.END, output_msg)

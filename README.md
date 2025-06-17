@@ -16,4 +16,6 @@ pip install pandas plotly requests
 Run `manage_products.py` to open a small GUI for adding items and category
 keywords. The tool now lets you enter the product's current price and unit
 cost. It creates an empty CSV file for scraped data, updates
-`category_keywords.json`, and appends the pricing info to the overview CSV.
+`category_keywords.json`, and appends the pricing info to the overview CSV. It
+also modifies `scraper.py` so that new categories are included when scraping
+competitor prices.
