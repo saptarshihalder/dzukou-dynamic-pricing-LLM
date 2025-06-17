@@ -522,7 +522,14 @@ def simulate_profit(
     relative_price = price / max(avg_competitor, 0.01)
 
     # Demand calculation with saturation and elasticity
-    demand = demand_base * saturation / (1 + (relative_price - 1) ** elasticity)
+    # When ``relative_price`` is below 1 the ``(relative_price - 1)`` term
+    # becomes negative. Raising a negative number to a fractional power would
+    # result in a complex value which breaks later calculations. Using the
+    # absolute difference keeps the demand model smooth while avoiding complex
+    # results.
+    demand = demand_base * saturation / (
+        1 + abs(relative_price - 1) ** elasticity
+    )
 
     # Additional market adjustments
     if relative_price > 1.5:  # heavy penalty for very high prices
