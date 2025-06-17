@@ -19,3 +19,13 @@ cost. It creates an empty CSV file for scraped data, updates
 `category_keywords.json`, and appends the pricing info to the overview CSV. It
 also modifies `scraper.py` so that new categories are included when scraping
 competitor prices.
+
+### A/B testing and Bayesian optimization
+`price_optimizer.py` now uses Bayesian optimization via `scikit-optimize` to
+search for prices that maximize simulated profit. If the library is not
+available, it falls back to the original grid search.
+
+The optimizer also includes a lightweight A/B test simulator. The `run_ab_test`
+function compares expected profit between the current and recommended prices
+using a stochastic demand model and reports a p-value. Results are stored in the
+`recommended_prices.csv` file for quick validation.

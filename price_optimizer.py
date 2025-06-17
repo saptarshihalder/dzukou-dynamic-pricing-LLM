@@ -6,8 +6,17 @@ import os
 import re
 import statistics
 import json
+import random
+from scipy import stats
 from pathlib import Path
 from typing import Dict, List
+
+try:
+    from skopt import gp_minimize
+    from skopt.space import Real
+except Exception:  # library may not be installed
+    gp_minimize = None
+    Real = None
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -99,6 +108,86 @@ def optimize_price(
         price += price_step
 
     best_price = max(best_price, base)
+    return round_price(best_price)
+
+
+def bayesian_optimize_price(
+    prices: List[float],
+    current_price: float,
+    unit_cost: float,
+    margin: float,
+    elasticity: float = 1.2,
+    max_markup: float = 1.8,
+    max_increase: float = 0.30,
+    max_decrease: float = 0.25,
+    demand_base: float = 100.0,
+    saturation: float = 1.0,
+    mean_cap_ratio: float | None = None,
+    n_calls: int = 20,
+) -> float:
+    """Use Bayesian optimization to maximize profit."""
+    if gp_minimize is None:
+        # fall back to grid search when skopt is unavailable
+        return optimize_price(
+            prices,
+            current_price,
+            unit_cost,
+            margin,
+            elasticity=elasticity,
+            max_markup=max_markup,
+            max_increase=max_increase,
+            max_decrease=max_decrease,
+            demand_base=demand_base,
+            saturation=saturation,
+            mean_cap_ratio=mean_cap_ratio,
+        )
+
+    base = unit_cost * (1 + margin)
+    if not prices:
+        avg = current_price
+        competitor_high = current_price
+        competitor_low = current_price
+    else:
+        avg = statistics.mean(prices)
+        competitor_high = max(prices)
+        competitor_low = min(prices)
+    stdev = statistics.stdev(prices) if len(prices) > 1 else 0.0
+    if mean_cap_ratio is None:
+        mean_cap_ratio = compute_mean_cap(avg, stdev)
+
+    low = max(base, competitor_low, current_price * (1 - max_decrease))
+    high = max(current_price, competitor_high, avg, base) * max_markup
+    high = min(high, current_price * (1 + max_increase), avg * mean_cap_ratio)
+    if high <= low:
+        return round_price(max(low, base))
+
+    space = [Real(low, high)]
+
+    def objective(x: List[float]) -> float:
+        p = x[0]
+        profit = simulate_profit(
+            p,
+            unit_cost,
+            avg,
+            demand_base,
+            elasticity,
+            saturation,
+        )
+        return -profit
+
+    res = gp_minimize(
+        objective,
+        space,
+        n_calls=n_calls,
+        n_random_starts=max(5, n_calls // 4),
+        random_state=0,
+    )
+
+    best_price = res.x[0]
+    best_price = max(best_price, base)
+    best_price = min(best_price, current_price * (1 + max_increase))
+    best_price = max(best_price, current_price * (1 - max_decrease))
+    best_price = min(best_price, avg * mean_cap_ratio)
     return round_price(best_price)
 
 
@@ -416,6 +505,39 @@ def simulate_profit(
     return demand * (price - unit_cost)
 
 
+def run_ab_test(
+    current_price: float,
+    new_price: float,
+    unit_cost: float,
+    avg_competitor: float,
+    demand_base: float = 100.0,
+    elasticity: float = 1.2,
+    saturation: float = 1.0,
+    noise: float = 0.1,
+    n: int = 1000,
+) -> Dict[str, float]:
+    """Simulate an A/B test comparing two prices."""
+    profits_control = []
+    profits_test = []
+    for _ in range(n):
+        base_a = demand_base * saturation / (1 + (current_price / max(avg_competitor, 0.01)) ** elasticity)
+        base_b = demand_base * saturation / (1 + (new_price / max(avg_competitor, 0.01)) ** elasticity)
+        demand_a = base_a * max(0.0, random.gauss(1.0, noise))
+        demand_b = base_b * max(0.0, random.gauss(1.0, noise))
+        profits_control.append(demand_a * (current_price - unit_cost))
+        profits_test.append(demand_b * (new_price - unit_cost))
+
+    mean_a = statistics.mean(profits_control)
+    mean_b = statistics.mean(profits_test)
+    stat, p_value = stats.ttest_ind(profits_test, profits_control, equal_var=False)
+    return {
+        "profit_control": mean_a,
+        "profit_test": mean_b,
+        "profit_delta": mean_b - mean_a,
+        "p_value": float(p_value),
+    }
+
+
 
 
 def suggest_price(
@@ -457,7 +579,7 @@ def suggest_price(
     try:
         price = call_llm(prompt)
     except Exception:
-        price = optimize_price(
+        price = bayesian_optimize_price(
             prices,
             cur,
             unit,
@@ -520,6 +642,15 @@ def main():
                 saturation=saturation,
             )
 
+            ab = run_ab_test(
+                info["current_price"],
+                price,
+                info["unit_cost"],
+                avg,
+                elasticity=DEMAND_ELASTICITY.get(category, 1.2),
+                saturation=saturation,
+            )
+
             total_current += profit_cur
             total_recommended += profit_new
 
@@ -537,6 +668,10 @@ def main():
                 "Profit Current": f"{profit_cur:.2f}",
                 "Profit Recommended": f"{profit_new:.2f}",
                 "Profit Delta": f"{(profit_new - profit_cur):.2f}",
+                "AB Profit Control": f"{ab['profit_control']:.2f}",
+                "AB Profit Test": f"{ab['profit_test']:.2f}",
+                "AB Profit Delta": f"{ab['profit_delta']:.2f}",
+                "AB P-Value": f"{ab['p_value']:.4f}",
             })
     out_path = BASE_DIR / "recommended_prices.csv"
     with open(out_path, "w", newline="") as f:
@@ -556,6 +691,10 @@ def main():
                 "Profit Current",
                 "Profit Recommended",
                 "Profit Delta",
+                "AB Profit Control",
+                "AB Profit Test",
+                "AB Profit Delta",
+                "AB P-Value",
             ],
         )
         writer.writeheader()
