@@ -671,7 +671,11 @@ def main():
                 "AB Profit Control": f"{ab['profit_control']:.2f}",
                 "AB Profit Test": f"{ab['profit_test']:.2f}",
                 "AB Profit Delta": f"{ab['profit_delta']:.2f}",
-                "AB P-Value": f"{ab['p_value']:.4f}",
+                # Use scientific notation to avoid displaying extremely small
+                # p-values as zero when rounded. Four decimal places caused
+                # all values to appear as 0.0000, so show the raw magnitude
+                # with exponent format.
+                "AB P-Value": f"{ab['p_value']:.3e}",
             })
     out_path = BASE_DIR / "recommended_prices.csv"
     with open(out_path, "w", newline="") as f:
