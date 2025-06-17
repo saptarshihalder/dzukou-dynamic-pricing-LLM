@@ -29,14 +29,19 @@ def compute_mean_cap(avg: float, stdev: float, max_cap: float = 1.3) -> float:
     """Return a limit for how far above the mean a price may go."""
     if avg <= 0:
         return max_cap
-    return min(1.0 + stdev / avg, max_cap)
+    # scale with coefficient of variation so markets with high dispersion allow
+    # slightly higher pricing while still capping extreme values
+    cv = stdev / avg
+    return min(1.0 + cv * 0.5, max_cap)
 
 
 def clean_prices(prices: List[float]) -> List[float]:
     """Remove outliers and invalid data from scraped prices."""
     valid = [p for p in prices if 0 < p < 10000]
     if len(valid) >= 4:
-        q1, q3 = statistics.quantiles(valid, n=4)[0], statistics.quantiles(valid, n=4)[2]
+        # compute quartiles separately for clarity
+        q1 = statistics.quantiles(valid, n=4)[0]
+        q3 = statistics.quantiles(valid, n=4)[2]
         iqr = q3 - q1
         low = q1 - 1.5 * iqr
         high = q3 + 1.5 * iqr
@@ -84,7 +89,7 @@ def optimize_price(
 
     # explore from the minimal acceptable price up to a generous markup,
     # while respecting caps relative to the current price and competitor mean
-    low = max(base, competitor_low, current_price * (1 - max_decrease))
+    low = max(base, competitor_low * 0.9, current_price * (1 - max_decrease))
     high = max(current_price, competitor_high, avg, base) * max_markup
     high = min(high, current_price * (1 + max_increase), avg * mean_cap_ratio)
     if high < low:
@@ -92,6 +97,13 @@ def optimize_price(
 
     best_price = base
     best_profit = -1e9
+
+    # grid search with adaptive resolution so very wide ranges don't take too
+    # long. the step is adjusted if more than 100 steps would be required.
+    steps = int((high - low) / price_step) + 1
+    if steps > 100:
+        price_step = (high - low) / 100
+
     price = low
     while price <= high:
         profit = simulate_profit(
@@ -123,7 +135,7 @@ def bayesian_optimize_price(
     demand_base: float = 100.0,
     saturation: float = 1.0,
     mean_cap_ratio: float | None = None,
-    n_calls: int = 20,
+    n_calls: int = 25,
 ) -> float:
     """Use Bayesian optimization to maximize profit."""
     if gp_minimize is None:
@@ -155,7 +167,7 @@ def bayesian_optimize_price(
     if mean_cap_ratio is None:
         mean_cap_ratio = compute_mean_cap(avg, stdev)
 
-    low = max(base, competitor_low, current_price * (1 - max_decrease))
+    low = max(base, competitor_low * 0.9, current_price * (1 - max_decrease))
     high = max(current_price, competitor_high, avg, base) * max_markup
     high = min(high, current_price * (1 + max_increase), avg * mean_cap_ratio)
     if high <= low:
@@ -180,7 +192,7 @@ def bayesian_optimize_price(
         space,
         n_calls=n_calls,
         n_random_starts=max(5, n_calls // 4),
-        random_state=0,
+        random_state=42,
     )
 
     best_price = res.x[0]
@@ -308,8 +320,14 @@ MAX_DECREASE = {
 
 
 def round_price(price: float) -> float:
-    """Round price to a corporate-friendly format (e.g., 0.99)."""
-    return round(price * 2) / 2 - 0.01
+    """Round price to a corporate-friendly format (e.g., .99 or .49)."""
+    # round to nearest 0.50 then subtract 0.01 for psychological pricing
+    rounded = round(price * 2) / 2
+    if rounded > 50:
+        # for high priced items prefer .99 endings
+        return int(rounded) - 0.01
+    # alternate between .49 and .99 for lower price points
+    return rounded - 0.01
 
 # Default keywords used if no external mapping file is present. The
 # mapping associates categories with words that identify products in that
@@ -446,7 +464,7 @@ def call_groq(prompt: str, model: str | None = None) -> float:
     if not api_key:
         raise RuntimeError("GROQ_API_KEY environment variable not set")
     if not model:
-        model = os.environ.get("GROQ_MODEL", "meta-llama/llama-guard-4-12b")
+        model = os.environ.get("GROQ_MODEL", "mixtral-8x7b-32768")
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {"model": model, "messages": [{"role": "user", "content": prompt}]}
@@ -496,12 +514,24 @@ def simulate_profit(
     elasticity: float = 1.2,
     saturation: float = 1.0,
 ) -> float:
-    """Estimate profit using a logistic demand model."""
+    """Estimate profit using a logistic demand model with market dynamics."""
     if price <= 0:
         return 0.0
 
+    # Price competitiveness factor
     relative_price = price / max(avg_competitor, 0.01)
-    demand = demand_base * saturation / (1 + relative_price ** elasticity)
+
+    # Demand calculation with saturation and elasticity
+    demand = demand_base * saturation / (1 + (relative_price - 1) ** elasticity)
+
+    # Additional market adjustments
+    if relative_price > 1.5:  # heavy penalty for very high prices
+        demand *= 0.7
+    elif relative_price < 0.8:  # slight boost for bargains
+        demand *= 1.2
+
+    demand = max(0, demand)
+
     return demand * (price - unit_cost)
 
 
