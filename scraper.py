@@ -18,6 +18,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from utils import canonical_key
 
 BASE_DIR = Path(__file__).resolve().parent
 MAPPING_CSV = BASE_DIR / "product_data_mapping.csv"
@@ -34,8 +35,6 @@ logger = logging.getLogger(__name__)
 def sanitize_filename(text: str) -> str:
     base = re.sub(r"\W+", "_", text.lower()).strip("_")
     return base + ".csv"
-
-
 DEFAULT_CATEGORIES = {
     "Wooden Sunglasses": {
         "search_terms": [
@@ -192,22 +191,43 @@ class ProductScraper:
         self.results_by_category = {cat: [] for cat in self.product_categories}
 
     def load_categories(self):
-        data = DEFAULT_CATEGORIES.copy()
+        """Return merged categories from defaults and keywords."""
+        merged = {}
+
+        # start with defaults using canonical keys
+        for cat, info in DEFAULT_CATEGORIES.items():
+            merged[canonical_key(cat)] = {
+                "name": cat,
+                "search_terms": list(info.get("search_terms", [])),
+                "csv_filename": info.get("csv_filename", sanitize_filename(cat)),
+            }
+
         if KEYWORDS_JSON.exists():
             try:
                 with open(KEYWORDS_JSON, "r", encoding="utf-8") as f:
                     kw_data = json.load(f)
                 for cat, kws in kw_data.items():
-                    info = data.get(cat, {})
-                    csv_name = info.get("csv_filename", sanitize_filename(cat))
-                    default_terms = info.get("search_terms", [])
-                    data[cat] = {
-                        "search_terms": list(set(default_terms + list(kws))),
-                        "csv_filename": csv_name,
-                    }
+                    key = canonical_key(cat)
+                    if key in merged:
+                        merged[key]["search_terms"] = list(
+                            set(merged[key]["search_terms"] + list(kws))
+                        )
+                    else:
+                        merged[key] = {
+                            "name": cat.strip(),
+                            "search_terms": list(kws),
+                            "csv_filename": sanitize_filename(cat),
+                        }
             except Exception as exc:
                 logger.warning("Failed loading keywords: %s", exc)
-        return data
+
+        return {
+            info["name"]: {
+                "search_terms": info["search_terms"],
+                "csv_filename": info["csv_filename"],
+            }
+            for info in merged.values()
+        }
 
     def clean_price(self, price_text):
         if not price_text:
