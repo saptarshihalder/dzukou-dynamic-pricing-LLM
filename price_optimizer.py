@@ -584,7 +584,7 @@ def suggest_price(
     cur: float,
     unit: float,
 ) -> float:
-    margin = PROFIT_MARGINS.get(category, 0.15)
+    margin = PROFIT_MARGINS.get(category, 0.30)
     elasticity = DEMAND_ELASTICITY.get(category, 1.2)
     max_markup = MAX_MARKUP.get(category, 1.8)
     max_increase = MAX_INCREASE.get(category, MAX_INCREASE["default"])
