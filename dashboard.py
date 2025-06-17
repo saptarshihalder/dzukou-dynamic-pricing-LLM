@@ -229,7 +229,7 @@ def build_dashboard(df, out_path=OUT_HTML):
     if fig_pvalue:
         pvalue_section = f"""
     <div class='mb-5'>
-        {fig_pvalue.to_html(full_html=False, include_plotlyjs=False, config={{'displayModeBar': False}})}
+        {fig_pvalue.to_html(full_html=False, include_plotlyjs=False, config={'displayModeBar': False})}
     </div>
     """
 
@@ -337,15 +337,15 @@ def build_dashboard(df, out_path=OUT_HTML):
     </div>
 
     <div class='mb-5'>
-        {fig_delta.to_html(full_html=False, include_plotlyjs='cdn', config={{'displayModeBar': False}})}
+        {fig_delta.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})}
     </div>
 
     <div class='mb-5'>
-        {fig_price.to_html(full_html=False, include_plotlyjs=False, config={{'displayModeBar': False}})}
+        {fig_price.to_html(full_html=False, include_plotlyjs=False, config={'displayModeBar': False})}
     </div>
 
     <div class='mb-5'>
-        {fig_percentage.to_html(full_html=False, include_plotlyjs=False, config={{'displayModeBar': False}})}
+        {fig_percentage.to_html(full_html=False, include_plotlyjs=False, config={'displayModeBar': False})}
     </div>
 
     {pvalue_section}
