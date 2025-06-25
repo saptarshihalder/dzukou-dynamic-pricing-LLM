@@ -86,12 +86,3 @@ python dashboard.py
 The generated CSV and HTML files can be shared with the rest of the team for review. Feel free to customise the scripts to add stores, adjust the demand model or extend the dashboard.
 
 
-## Unified GUI
-
-You can drive all steps from a single window with:
-
-```bash
-python app.py
-```
-
-The buttons let you open the product manager, run scraping, optimisation and dashboard creation sequentially.
