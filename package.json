@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run server\" \"vite\"",
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server/index.js"
@@ -27,6 +27,7 @@
     "lucide-react": "^0.294.0",
     "tailwindcss": "^3.3.6",
     "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32"
+    "postcss": "^8.4.32",
+    "concurrently": "^8.2.2"
   }
 }
