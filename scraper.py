@@ -5,17 +5,12 @@ import logging
 import random
 import re
 import time
+import urllib.parse
 from pathlib import Path
-from urllib.parse import quote
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
 from utils import canonical_key
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -27,6 +22,10 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# Scraping Fish API configuration
+SCRAPING_FISH_API_KEY = "p78IIwfssgglRGGvhdw6Aj8wwZKMinBpAD8y436l5ha3drW6gn9yfyRiDrSmFiwmUi3GF4dHR9F43LJRDo"
+SCRAPING_FISH_BASE_URL = "https://scraping.narf.ai/api/v1/"
 
 
 def sanitize_filename(text: str) -> str:
@@ -156,24 +155,6 @@ DEFAULT_CATEGORIES = {
 class ProductScraper:
     def __init__(self) -> None:
         self.session = requests.Session()
-        self.user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-        ]
-        self.session.headers.update(
-            {
-                "User-Agent": random.choice(self.user_agents),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.5",
-            }
-        )
-        self.chrome_options = Options()
-        self.chrome_options.add_argument("--headless")
-        self.chrome_options.add_argument("--no-sandbox")
-        self.chrome_options.add_argument("--disable-dev-shm-usage")
-        self.chrome_options.add_argument("--disable-gpu")
-        self.chrome_options.add_argument(f"--user-agent={random.choice(self.user_agents)}")
 
         self.stores = {
             "Made Trade": {"url": "https://www.madetrade.com", "search_pattern": "/search?q={}"},
@@ -276,12 +257,37 @@ class ProductScraper:
                 products.append({"name": product_name, "price": price, "search_term": search_term})
         return products
 
+    def scrape_with_scrapingfish(self, store_name, store_cfg, term):
+        """Scrape using Scraping Fish API."""
+        products = []
+        try:
+            # Construct the target URL with search term
+            target_url = store_cfg["url"] + store_cfg["search_pattern"].format(urllib.parse.quote(term))
+            
+            # Prepare Scraping Fish API request
+            params = {
+                "api_key": SCRAPING_FISH_API_KEY,
+                "url": target_url,
+                "format": "html"
+            }
+            
+            logger.info("Scraping Fish requesting: %s", target_url)
+            response = self.session.get(SCRAPING_FISH_BASE_URL, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                products = self.extract_products_from_html(response.content, term)
+                logger.info("Found %d products via Scraping Fish", len(products))
+            else:
+                logger.error("Scraping Fish API error: %s", response.status_code)
+        except Exception as exc:
+            logger.error("Error with Scraping Fish API: %s", exc)
+        return products
+
     def scrape_with_requests(self, store_name, store_cfg, term):
         products = []
         try:
-            url = store_cfg["url"] + store_cfg["search_pattern"].format(quote(term))
+            url = store_cfg["url"] + store_cfg["search_pattern"].format(urllib.parse.quote(term))
             logger.info("Requesting: %s", url)
-            self.session.headers["User-Agent"] = random.choice(self.user_agents)
             resp = self.session.get(url, timeout=10)
             if resp.status_code == 200:
                 products = self.extract_products_from_html(resp.content, term)
@@ -290,59 +296,23 @@ class ProductScraper:
             logger.error("Error with requests: %s", exc)
         return products
 
-    def scrape_with_selenium(self, store_name, store_cfg, term):
-        products = []
-        driver = None
-        try:
-            driver = webdriver.Chrome(options=self.chrome_options)
-            url = store_cfg["url"] + store_cfg["search_pattern"].format(quote(term))
-            logger.info("Selenium visiting: %s", url)
-            driver.get(url)
-            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
-            time.sleep(1)
-            elems = driver.find_elements(By.XPATH, "//*[contains(text(), '$')]")
-            for elem in elems[:30]:
-                parent = elem
-                for _ in range(3):
-                    if parent:
-                        try:
-                            parent = parent.find_element(By.XPATH, "..")
-                        except Exception:
-                            break
-                if not parent:
-                    continue
-                name_elems = parent.find_elements(By.CSS_SELECTOR, "h1, h2, h3, h4, a, .title, .name, span")
-                product_name = None
-                for nm in name_elems:
-                    text = nm.text.strip()
-                    if len(text) > 3 and "$" not in text:
-                        product_name = self.clean_product_name(text)
-                        if product_name:
-                            break
-                if not product_name:
-                    continue
-                price = self.clean_price(elem.text)
-                if product_name and price and price > 0:
-                    products.append({"name": product_name, "price": price, "search_term": term})
-        except Exception as exc:
-            logger.error("Error with Selenium: %s", exc)
-        finally:
-            if driver:
-                driver.quit()
-        logger.info("Found %d products via Selenium", len(products))
-        return products
-
     def scrape_store(self, store_name, store_cfg, category, terms):
         all_products = []
         for term in terms:
             logger.info("Searching for '%s' in %s", term, store_name)
-            products = self.scrape_with_requests(store_name, store_cfg, term)
+            
+            # Try Scraping Fish API first, fallback to requests if needed
+            products = self.scrape_with_scrapingfish(store_name, store_cfg, term)
             if not products:
-                products = self.scrape_with_selenium(store_name, store_cfg, term)
+                logger.info("Scraping Fish failed, trying direct requests...")
+                products = self.scrape_with_requests(store_name, store_cfg, term)
+            
             if products:
                 all_products.extend(products)
-            time.sleep(random.uniform(1, 2))
+            
+            # Add delay to be respectful to the API
+            time.sleep(random.uniform(2, 4))
+            
         unique = []
         seen = set()
         for p in all_products:
@@ -380,7 +350,7 @@ class ProductScraper:
                     logger.error("Network error with %s: %s", store_name, exc)
                 except Exception as exc:
                     logger.error("Error scraping %s for %s: %s", store_name, category, exc)
-                time.sleep(random.uniform(1.5, 3.0))
+                time.sleep(random.uniform(2.0, 4.0))
 
     def save_category_csvs(self):
         saved = []
