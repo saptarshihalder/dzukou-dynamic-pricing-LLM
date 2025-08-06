@@ -8,7 +8,9 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Globe
+  Globe,
+  Download,
+  FileText
 } from 'lucide-react'
 
 const PricingScraper = ({ products, status, onStatusChange, onComplete, onNext }) => {
@@ -26,6 +28,34 @@ const PricingScraper = ({ products, status, onStatusChange, onComplete, onNext }
     { name: 'Zero Waste Store', url: 'zerowastestoreonline.com', status: 'pending' }
   ]
 
+  const downloadScrapedData = () => {
+    if (scrapedData.length === 0) {
+      alert('No scraped data available to download')
+      return
+    }
+    
+    // Convert to CSV format
+    const headers = ['Category', 'Store', 'Product Name', 'Price', 'Search Term', 'Store URL']
+    const csvContent = [
+      headers.join(','),
+      ...scrapedData.map(item => [
+        item.category,
+        item.store,
+        `"${item.product_name.replace(/"/g, '""')}"`,
+        item.price,
+        item.search_term,
+        item.store_url
+      ].join(','))
+    ].join('\n')
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `competitor-data-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
   const startScraping = async () => {
     if (products.length === 0) {
       alert('Please add products first before scraping competitor data.')
@@ -139,6 +169,16 @@ const PricingScraper = ({ products, status, onStatusChange, onComplete, onNext }
               >
                 Next: Optimize Prices
                 <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
+            
+            {scrapedData.length > 0 && (
+              <button 
+                onClick={downloadScrapedData}
+                className="btn-secondary"
+              >
+                <Download className="w-4 h-4" />
+                Download Data
               </button>
             )}
           </div>

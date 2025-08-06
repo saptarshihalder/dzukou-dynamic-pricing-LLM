@@ -8,11 +8,14 @@ import {
   ArrowRight,
   Package,
   DollarSign,
-  Tag
+  Tag,
+  RefreshCw,
+  FileText
 } from 'lucide-react'
 
 const ProductManager = ({ products, onProductAdded, onNext }) => {
   const [showAddForm, setShowAddForm] = useState(false)
+  const [isLoadingCSV, setIsLoadingCSV] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     id: '',
@@ -36,6 +39,30 @@ const ProductManager = ({ products, onProductAdded, onNext }) => {
     'Other scarves and shawls'
   ]
 
+  const loadExistingData = async () => {
+    setIsLoadingCSV(true)
+    try {
+      const response = await fetch('/api/products/load-csv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        onProductAdded()
+        alert(`Successfully loaded ${data.count} products from CSV!`)
+      } else {
+        throw new Error('Failed to load CSV data')
+      }
+    } catch (error) {
+      console.error('Error loading CSV:', error)
+      alert('Error loading CSV data. Please try again.')
+    } finally {
+      setIsLoadingCSV(false)
+    }
+  }
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -128,6 +155,24 @@ const ProductManager = ({ products, onProductAdded, onNext }) => {
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-4 mb-8">
+        <button 
+          onClick={loadExistingData}
+          disabled={isLoadingCSV}
+          className="btn-primary disabled:opacity-50"
+        >
+          {isLoadingCSV ? (
+            <>
+              <RefreshCw className="w-5 h-5 loading-spinner" />
+              Loading...
+            </>
+          ) : (
+            <>
+              <FileText className="w-5 h-5" />
+              Load Existing CSV
+            </>
+          )}
+        </button>
+        
         <button 
           onClick={() => setShowAddForm(true)}
           className="btn-primary"

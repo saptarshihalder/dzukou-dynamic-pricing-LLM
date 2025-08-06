@@ -17,6 +17,7 @@ import PricingScraper from './components/PricingScraper'
 import PriceOptimizer from './components/PriceOptimizer'
 import Dashboard from './components/Dashboard'
 import Tutorial from './components/Tutorial'
+import ScrapingInterface from './components/ScrapingInterface'
 import LoadingSpinner from './components/LoadingSpinner'
 import Toast from './components/Toast'
 
@@ -37,6 +38,7 @@ function App() {
     { id: 'tutorial', label: 'Getting Started', icon: Info },
     { id: 'products', label: 'Manage Products', icon: ShoppingCart },
     { id: 'scraper', label: 'Collect Data', icon: Database },
+    { id: 'advanced-scraper', label: 'Advanced Scraper', icon: Database },
     { id: 'optimizer', label: 'Optimize Prices', icon: TrendingUp },
     { id: 'dashboard', label: 'View Results', icon: BarChart3 }
   ]
@@ -142,6 +144,10 @@ function App() {
             onComplete={handleScrapingComplete}
             onNext={() => setActiveTab('optimizer')}
           />
+        )}
+        
+        {activeTab === 'advanced-scraper' && (
+          <ScrapingInterface />
         )}
         
         {activeTab === 'optimizer' && (

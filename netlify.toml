@@ -1,0 +1,33 @@
+[build]
+  # Directory with serverless functions
+  functions = "netlify/functions"
+  
+  # Build command
+  command = "npm run build"
+  
+  # Directory to publish (your static files)
+  publish = "dist"
+
+[functions]
+  # Node.js version for functions
+  node_bundler = "esbuild"
+  
+  # Function timeout (max 26 seconds for free tier)
+  timeout = 26
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
+
+[dev]
+  port = 8888
+  targetPort = 5173
+  autoLaunch = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
