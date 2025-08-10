@@ -17,8 +17,22 @@ const PricingScraper = ({ products, status, onStatusChange, onComplete, onNext }
   const [isRunning, setIsRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [currentStore, setCurrentStore] = useState('')
+  const [currentKeyword, setCurrentKeyword] = useState('')
   const [scrapedData, setScrapedData] = useState([])
   const [logs, setLogs] = useState([])
+
+  // Abstract API configuration
+  const ABSTRACT_API_KEY = '96f5aedb1c894ca6afafb0223600d065'
+  const ABSTRACT_API_URL = 'https://scrape.abstractapi.com/v1/'
+
+  // Store configurations
+  const STORE_CONFIGS = {
+    'EarthHero': 'https://earthhero.com/search?q={}',
+    'Package Free Shop': 'https://packagefreeshop.com/search?q={}',
+    'Ten Thousand Villages': 'https://www.tenthousandvillages.com/search?q={}',
+    'Made Trade': 'https://www.madetrade.com/search?q={}',
+    'Zero Waste Store': 'https://zerowastestoreonline.com/search?q={}'
+  }
 
   const stores = [
     { name: 'EarthHero', url: 'earthhero.com', status: 'pending' },
@@ -27,6 +41,130 @@ const PricingScraper = ({ products, status, onStatusChange, onComplete, onNext }
     { name: 'Made Trade', url: 'madetrade.com', status: 'pending' },
     { name: 'Zero Waste Store', url: 'zerowastestoreonline.com', status: 'pending' }
   ]
+
+  // Helper function for async HTTP requests using XMLHttpRequest
+  const httpGetAsync = (url) => {
+    return new Promise((resolve, reject) => {
+      const xmlHttp = new XMLHttpRequest()
+      xmlHttp.onreadystatechange = function() {
+        if (xmlHttp.readyState === 4) {
+          if (xmlHttp.status === 200) {
+            resolve(xmlHttp.responseText)
+          } else {
+            reject(new Error(`HTTP ${xmlHttp.status}: ${xmlHttp.statusText}`))
+          }
+        }
+      }
+      xmlHttp.open("GET", url, true)
+      xmlHttp.send(null)
+    })
+  }
+
+  // Extract price from text
+  const extractPrice = (text) => {
+    if (!text) return null
+    const priceMatch = text.match(/\$?(\d+(?:\.\d{2})?)/g)
+    if (priceMatch) {
+      const prices = priceMatch.map(p => parseFloat(p.replace('$', '')))
+      return prices.find(p => p > 0 && p < 10000) || null
+    }
+    return null
+  }
+
+  // Extract products from HTML content
+  const extractProductsFromHTML = (html, storeName, keyword) => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    const products = []
+
+    // Look for elements containing price information
+    const allElements = doc.querySelectorAll('*')
+    const priceElements = Array.from(allElements).filter(el => {
+      const text = el.textContent || ''
+      return /\$\d+/.test(text) && text.length < 200
+    })
+
+    priceElements.slice(0, 20).forEach((element, index) => {
+      try {
+        const price = extractPrice(element.textContent)
+        if (price) {
+          // Try to find associated product name
+          let name = ''
+          let current = element
+          
+          // Look in parent elements for product name
+          for (let i = 0; i < 3 && current.parentElement; i++) {
+            current = current.parentElement
+            const nameElements = current.querySelectorAll('h1, h2, h3, h4, a, .title, .name')
+            
+            for (const nameEl of nameElements) {
+              const text = nameEl.textContent?.trim()
+              if (text && text.length > 3 && !text.includes('$') && text.length < 100) {
+                name = text
+                break
+              }
+            }
+            if (name) break
+          }
+
+          if (!name) {
+            name = `${keyword} Product ${index + 1} from ${storeName}`
+          }
+
+          products.push({
+            category: keyword,
+            store: storeName,
+            product_name: name,
+            price: price.toFixed(2),
+            search_term: keyword,
+            store_url: STORE_CONFIGS[storeName]?.replace('/search?q={}', '') || `https://${storeName.toLowerCase().replace(/\s+/g, '')}.com`
+          })
+        }
+      } catch (error) {
+        console.error('Error processing element:', error)
+      }
+    })
+
+    return products
+  }
+
+  // Add log entry
+  const addLog = (message) => {
+    const timestamp = new Date().toISOString().substr(11, 8)
+    setLogs(prev => [...prev, { timestamp, message }])
+  }
+
+  // Scrape single store with Abstract API
+  const scrapeStoreWithAbstract = async (storeName, keyword) => {
+    try {
+      const searchUrl = STORE_CONFIGS[storeName]?.replace('{}', encodeURIComponent(keyword))
+      if (!searchUrl) {
+        addLog(`No search URL configured for ${storeName}`)
+        return []
+      }
+
+      addLog(`Scraping ${storeName} for "${keyword}"`)
+      setCurrentStore(storeName)
+      setCurrentKeyword(keyword)
+      
+      const abstractUrl = `${ABSTRACT_API_URL}?api_key=${ABSTRACT_API_KEY}&url=${encodeURIComponent(searchUrl)}`
+      
+      const response = await httpGetAsync(abstractUrl)
+      const data = JSON.parse(response)
+      
+      if (data.content) {
+        const products = extractProductsFromHTML(data.content, storeName, keyword)
+        addLog(`Found ${products.length} products from ${storeName}`)
+        return products
+      } else {
+        addLog(`No content returned from ${storeName}`)
+        return []
+      }
+    } catch (error) {
+      addLog(`Error scraping ${storeName}: ${error.message}`)
+      return []
+    }
+  }
 
   const downloadScrapedData = () => {
     if (scrapedData.length === 0) {
@@ -65,66 +203,52 @@ const PricingScraper = ({ products, status, onStatusChange, onComplete, onNext }
     setIsRunning(true)
     onStatusChange('running')
     setProgress(0)
+    setCurrentStore('')
+    setCurrentKeyword('')
     setLogs([])
+    setScrapedData([])
+    
+    addLog('Starting competitor data collection with Abstract API...')
 
     try {
-      const response = await fetch('/api/scraper/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ products }),
-      })
-
-      if (response.ok) {
-        // Start polling for progress
-        pollProgress()
-      } else {
-        throw new Error('Failed to start scraping')
+      const allResults = []
+      const storeNames = Object.keys(STORE_CONFIGS)
+      const totalOperations = storeNames.length * products.length
+      let completed = 0
+      
+      for (const storeName of storeNames) {
+        for (const product of products) {
+          const keyword = product.keywords?.split(',')[0]?.trim() || product.category.toLowerCase()
+          
+          const results = await scrapeStoreWithAbstract(storeName, keyword)
+          allResults.push(...results)
+          
+          completed++
+          setProgress((completed / totalOperations) * 100)
+          
+          // Add delay between requests to be respectful
+          await new Promise(resolve => setTimeout(resolve, 3000))
+        }
       }
+      
+      setScrapedData(allResults)
+      setIsRunning(false)
+      onStatusChange('completed')
+      addLog(`Data collection completed! Found ${allResults.length} total products.`)
+      onComplete()
+      
     } catch (error) {
       console.error('Error starting scraper:', error)
-      setIsRunning(false)
-      onStatusChange('error')
-    }
-  }
-
-  const pollProgress = async () => {
-    try {
-      const response = await fetch('/api/scraper/progress')
-      const data = await response.json()
-      
-      setProgress(data.progress)
-      setCurrentStore(data.currentStore)
-      setLogs(data.logs)
-      
-      if (data.completed) {
-        setIsRunning(false)
-        onStatusChange('completed')
-        setScrapedData(data.results)
-        onComplete()
-      } else if (data.error) {
-        setIsRunning(false)
-        onStatusChange('error')
-      } else {
-        // Continue polling
-        setTimeout(pollProgress, 2000)
-      }
-    } catch (error) {
-      console.error('Error polling progress:', error)
+      addLog(`Error: ${error.message}`)
       setIsRunning(false)
       onStatusChange('error')
     }
   }
 
   const stopScraping = async () => {
-    try {
-      await fetch('/api/scraper/stop', { method: 'POST' })
-      setIsRunning(false)
-      onStatusChange('stopped')
-    } catch (error) {
-      console.error('Error stopping scraper:', error)
-    }
+    setIsRunning(false)
+    onStatusChange('stopped')
+    addLog('Scraping stopped by user')
   }
 
   return (
@@ -192,7 +316,7 @@ const PricingScraper = ({ products, status, onStatusChange, onComplete, onNext }
                 Progress: {Math.round(progress)}%
               </span>
               <span className="text-sm text-gray-500">
-                Currently scraping: {currentStore}
+                {currentStore} - "{currentKeyword}"
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -215,7 +339,9 @@ const PricingScraper = ({ products, status, onStatusChange, onComplete, onNext }
           {status === 'running' && (
             <>
               <RefreshCw className="w-5 h-5 text-blue-600 loading-spinner" />
-              <span className="text-blue-600">Collecting competitor data...</span>
+              <span className="text-blue-600">
+                Collecting competitor data using Abstract API...
+              </span>
             </>
           )}
           {status === 'completed' && (
@@ -273,7 +399,7 @@ const PricingScraper = ({ products, status, onStatusChange, onComplete, onNext }
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
               <div className="text-3xl font-bold text-primary-600 mb-2">
-                {scrapedData.reduce((sum, item) => sum + item.productCount, 0)}
+                {scrapedData.length}
               </div>
               <div className="text-sm text-gray-600">Total Products Found</div>
             </div>
@@ -288,6 +414,38 @@ const PricingScraper = ({ products, status, onStatusChange, onComplete, onNext }
                 {products.length}
               </div>
               <div className="text-sm text-gray-600">Your Products</div>
+            </div>
+          </div>
+          
+          {/* Sample of scraped products */}
+          <div className="mt-6">
+            <h3 className="text-lg font-medium mb-4">Sample Results</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Product</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Price</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Store</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Category</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scrapedData.slice(0, 10).map((item, index) => (
+                    <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4 font-medium">{item.product_name}</td>
+                      <td className="py-3 px-4">€{item.price}</td>
+                      <td className="py-3 px-4">{item.store}</td>
+                      <td className="py-3 px-4 text-sm text-gray-600">{item.category}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {scrapedData.length > 10 && (
+                <div className="text-center py-3 text-gray-500 text-sm">
+                  Showing 10 of {scrapedData.length} products
+                </div>
+              )}
             </div>
           </div>
         </div>

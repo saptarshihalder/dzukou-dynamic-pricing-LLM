@@ -6,13 +6,15 @@ import {
   Search,
   CheckCircle,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react'
 
 const ScrapingInterface = () => {
   const [isRunning, setIsRunning] = useState(false)
   const [results, setResults] = useState(null)
   const [error, setError] = useState(null)
+  const [progress, setProgress] = useState({ current: 0, total: 0, store: '', keyword: '' })
   const [config, setConfig] = useState({
     category: 'Eco Products',
     keywords: 'bamboo toothbrush\neco friendly soap\nreusable water bottle',
@@ -22,10 +24,151 @@ const ScrapingInterface = () => {
   const availableStores = [
     { id: 'earthhero.com', name: 'EarthHero', url: 'earthhero.com' },
     { id: 'packagefreeshop.com', name: 'Package Free Shop', url: 'packagefreeshop.com' },
-    { id: 'grove.co', name: 'Grove Collaborative', url: 'grove.co' },
     { id: 'tenthousandvillages.com', name: 'Ten Thousand Villages', url: 'tenthousandvillages.com' },
-    { id: 'madetrade.com', name: 'Made Trade', url: 'madetrade.com' }
+    { id: 'madetrade.com', name: 'Made Trade', url: 'madetrade.com' },
+    { id: 'zerowastestoreonline.com', name: 'Zero Waste Store', url: 'zerowastestoreonline.com' }
   ]
+
+  // Abstract API configuration
+  const ABSTRACT_API_KEY = '96f5aedb1c894ca6afafb0223600d065'
+  const ABSTRACT_API_URL = 'https://scrape.abstractapi.com/v1/'
+
+  // Store search URL patterns
+  const STORE_SEARCH_PATTERNS = {
+    'earthhero.com': 'https://earthhero.com/search?q={}',
+    'packagefreeshop.com': 'https://packagefreeshop.com/search?q={}',
+    'tenthousandvillages.com': 'https://www.tenthousandvillages.com/search?q={}',
+    'madetrade.com': 'https://www.madetrade.com/search?q={}',
+    'zerowastestoreonline.com': 'https://zerowastestoreonline.com/search?q={}'
+  }
+
+  // Helper function for async HTTP requests
+  const httpGetAsync = (url) => {
+    return new Promise((resolve, reject) => {
+      const xmlHttp = new XMLHttpRequest()
+      xmlHttp.onreadystatechange = function() {
+        if (xmlHttp.readyState === 4) {
+          if (xmlHttp.status === 200) {
+            resolve(xmlHttp.responseText)
+          } else {
+            reject(new Error(`HTTP ${xmlHttp.status}: ${xmlHttp.statusText}`))
+          }
+        }
+      }
+      xmlHttp.open("GET", url, true)
+      xmlHttp.send(null)
+    })
+  }
+
+  // Extract price from text
+  const extractPrice = (text) => {
+    if (!text) return null
+    const priceMatch = text.match(/\$?(\d+(?:\.\d{2})?)/g)
+    if (priceMatch) {
+      const prices = priceMatch.map(p => parseFloat(p.replace('$', '')))
+      return prices.find(p => p > 0 && p < 10000) || null
+    }
+    return null
+  }
+
+  // Extract products from HTML
+  const extractProductsFromHTML = (html, store, keyword) => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    const products = []
+
+    // Common selectors for product containers
+    const selectors = [
+      '.product-item',
+      '.product-card', 
+      '.grid-product',
+      '.product-tile',
+      '[data-product-id]',
+      '.collection-item'
+    ]
+
+    let containers = []
+    for (const selector of selectors) {
+      containers = doc.querySelectorAll(selector)
+      if (containers.length > 0) break
+    }
+
+    // If no specific containers found, look for price patterns
+    if (containers.length === 0) {
+      const allElements = doc.querySelectorAll('*')
+      containers = Array.from(allElements).filter(el => {
+        const text = el.textContent || ''
+        return /\$\d+/.test(text) && text.length < 200
+      }).slice(0, 20)
+    }
+
+    Array.from(containers).slice(0, 30).forEach((container, index) => {
+      try {
+        const textContent = container.textContent || ''
+        const price = extractPrice(textContent)
+        
+        if (price) {
+          // Try to find product name
+          let name = ''
+          const nameSelectors = ['h1', 'h2', 'h3', 'h4', '.title', '.name', 'a']
+          
+          for (const selector of nameSelectors) {
+            const nameEl = container.querySelector(selector)
+            if (nameEl && nameEl.textContent.trim() && !nameEl.textContent.includes('$')) {
+              name = nameEl.textContent.trim().substring(0, 100)
+              break
+            }
+          }
+
+          if (!name) {
+            // Fallback: use text content without price
+            name = textContent.replace(/\$[\d.]+/g, '').trim().substring(0, 50)
+          }
+
+          if (name && name.length > 3) {
+            products.push({
+              name: name,
+              price: price,
+              store: store,
+              keyword: keyword,
+              scrapedAt: new Date().toISOString()
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error extracting product:', error)
+      }
+    })
+
+    return products
+  }
+
+  // Scrape a single store
+  const scrapeStore = async (store, keyword) => {
+    try {
+      const searchUrl = STORE_SEARCH_PATTERNS[store]?.replace('{}', encodeURIComponent(keyword))
+      if (!searchUrl) {
+        throw new Error(`No search pattern configured for ${store}`)
+      }
+
+      const abstractUrl = `${ABSTRACT_API_URL}?api_key=${ABSTRACT_API_KEY}&url=${encodeURIComponent(searchUrl)}`
+      
+      setProgress(prev => ({ ...prev, store, keyword }))
+      
+      const response = await httpGetAsync(abstractUrl)
+      const data = JSON.parse(response)
+      
+      if (data.content) {
+        return extractProductsFromHTML(data.content, store, keyword)
+      } else {
+        console.error('No content returned from Abstract API')
+        return []
+      }
+    } catch (error) {
+      console.error(`Error scraping ${store} for ${keyword}:`, error)
+      return []
+    }
+  }
 
   const startScraping = async () => {
     if (!config.category.trim()) {
@@ -47,32 +190,40 @@ const ScrapingInterface = () => {
     setIsRunning(true)
     setError(null)
     setResults(null)
+    setProgress({ current: 0, total: config.stores.length * keywords.length, store: '', keyword: '' })
 
     try {
-      const response = await fetch('/.netlify/functions/scrape-products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          category: config.category,
-          keywords: keywords,
-          stores: config.stores
-        })
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setResults(data)
-      } else {
-        setError(data.error || 'Scraping failed')
+      const allProducts = []
+      let current = 0
+      
+      for (const store of config.stores) {
+        for (const keyword of keywords) {
+          current++
+          setProgress(prev => ({ ...prev, current, store, keyword }))
+          
+          const products = await scrapeStore(store, keyword)
+          allProducts.push(...products)
+          
+          // Add delay between requests
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
       }
+      
+      const results = {
+        success: true,
+        category: config.category,
+        totalProducts: allProducts.length,
+        products: allProducts,
+        scrapedAt: new Date().toISOString()
+      }
+      
+      setResults(results)
     } catch (error) {
       console.error('Error:', error)
       setError('Network error. Please try again.')
     } finally {
       setIsRunning(false)
+      setProgress({ current: 0, total: 0, store: '', keyword: '' })
     }
   }
 
@@ -226,6 +377,26 @@ const ScrapingInterface = () => {
             )}
           </button>
         </div>
+        
+        {/* Progress Display */}
+        {isRunning && (
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">
+                Progress: {progress.current} / {progress.total}
+              </span>
+              <span className="text-sm text-gray-500">
+                {progress.store} - "{progress.keyword}"
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${(progress.current / progress.total) * 100}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Loading State */}
@@ -234,7 +405,10 @@ const ScrapingInterface = () => {
           <RefreshCw className="w-8 h-8 text-primary-600 loading-spinner mx-auto mb-4" />
           <h3 className="text-lg font-medium mb-2">Scraping in Progress</h3>
           <p className="text-gray-600">
-            Collecting product data from {config.stores.length} stores...
+            Currently scraping: {progress.store} for "{progress.keyword}"
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            {progress.current} of {progress.total} searches completed
           </p>
         </div>
       )}
@@ -346,9 +520,10 @@ const ScrapingInterface = () => {
                             href={product.url} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="text-primary-600 hover:text-primary-800"
+                            className="text-primary-600 hover:text-primary-800 flex items-center gap-1"
                           >
                             View
+                            <ExternalLink className="w-3 h-3" />
                           </a>
                         ) : (
                           <span className="text-gray-400">N/A</span>
@@ -367,6 +542,21 @@ const ScrapingInterface = () => {
           </div>
         </div>
       )}
+      
+      {/* API Information */}
+      <div className="card bg-blue-50 border-blue-200">
+        <div className="flex items-start gap-3">
+          <Globe className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
+          <div>
+            <h3 className="font-semibold text-blue-900 mb-2">Powered by Abstract API</h3>
+            <p className="text-blue-800 text-sm">
+              This scraper uses Abstract API's web scraping service to reliably collect competitor data 
+              from e-commerce websites. The service handles JavaScript rendering and anti-bot protection 
+              to ensure consistent data collection.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
