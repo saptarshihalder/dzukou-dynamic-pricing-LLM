@@ -17,23 +17,17 @@ export const STORE_SEARCH_PATTERNS = {
 /**
  * Helper function for async HTTP requests using XMLHttpRequest
  * @param {string} url - URL to fetch
- * @returns {Promise<string>} - Response text
+* @param {Function} callback - Callback function to handle response
  */
-export const httpGetAsync = (url) => {
-  return new Promise((resolve, reject) => {
-    const xmlHttp = new XMLHttpRequest()
-    xmlHttp.onreadystatechange = function() {
-      if (xmlHttp.readyState === 4) {
-        if (xmlHttp.status === 200) {
-          resolve(xmlHttp.responseText)
-        } else {
-          reject(new Error(`HTTP ${xmlHttp.status}: ${xmlHttp.statusText}`))
-        }
-      }
+export const httpGetAsync = (url, callback) => {
+  const xmlHttp = new XMLHttpRequest()
+  xmlHttp.onreadystatechange = function() {
+    if (xmlHttp.readyState === 4 && xmlHttp.status === 200) {
+      callback(xmlHttp.responseText)
     }
-    xmlHttp.open("GET", url, true)
-    xmlHttp.send(null)
-  })
+  }
+  xmlHttp.open("GET", url, true) // true for asynchronous
+  xmlHttp.send(null)
 }
 
 /**
@@ -158,34 +152,38 @@ export const extractProductsFromHTML = (html, storeName, keyword) => {
  * @returns {Promise<Array>} - Array of scraped products
  */
 export const scrapeStoreWithAbstract = async (storeName, keyword) => {
-  try {
+  return new Promise((resolve, reject) => {
     const storeKey = storeName.toLowerCase().replace(/\s+/g, '')
     const searchPattern = STORE_SEARCH_PATTERNS[storeKey]
     
     if (!searchPattern) {
-      throw new Error(`No search pattern configured for ${storeName}`)
+      reject(new Error(`No search pattern configured for ${storeName}`))
+      return
     }
 
     const searchUrl = searchPattern.replace('{}', encodeURIComponent(keyword))
-    const abstractUrl = `${ABSTRACT_API_URL}?api_key=${ABSTRACT_API_KEY}&url=${encodeURIComponent(searchUrl)}`
+    const abstractUrl = `https://scrape.abstractapi.com/v1/?api_key=${ABSTRACT_API_KEY}&url=${encodeURIComponent(searchUrl)}`
     
     console.log(`Scraping ${storeName} for "${keyword}"`)
     
-    const response = await httpGetAsync(abstractUrl)
-    const data = JSON.parse(response)
-    
-    if (data.content) {
-      const products = extractProductsFromHTML(data.content, storeName, keyword)
-      console.log(`Found ${products.length} products from ${storeName}`)
-      return products
-    } else {
-      console.log(`No content returned from ${storeName}`)
-      return []
-    }
-  } catch (error) {
-    console.error(`Error scraping ${storeName}:`, error.message)
-    return []
-  }
+    httpGetAsync(abstractUrl, (response) => {
+      try {
+        const data = JSON.parse(response)
+        
+        if (data.content) {
+          const products = extractProductsFromHTML(data.content, storeName, keyword)
+          console.log(`Found ${products.length} products from ${storeName}`)
+          resolve(products)
+        } else {
+          console.log(`No content returned from ${storeName}`)
+          resolve([])
+        }
+      } catch (error) {
+        console.error(`Error parsing response from ${storeName}:`, error.message)
+        resolve([])
+      }
+    })
+  })
 }
 
 /**

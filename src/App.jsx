@@ -18,6 +18,7 @@ import PriceOptimizer from './components/PriceOptimizer'
 import Dashboard from './components/Dashboard'
 import Tutorial from './components/Tutorial'
 import ScrapingInterface from './components/ScrapingInterface'
+import ProfitAnalyzer from './components/ProfitAnalyzer'
 import LoadingSpinner from './components/LoadingSpinner'
 import Toast from './components/Toast'
 
@@ -37,6 +38,7 @@ function App() {
   const tabs = [
     { id: 'tutorial', label: 'Getting Started', icon: Info },
     { id: 'products', label: 'Manage Products', icon: ShoppingCart },
+    { id: 'analysis', label: 'Profit Analysis', icon: TrendingUp },
     { id: 'scraper', label: 'Collect Data', icon: Database },
     { id: 'advanced-scraper', label: 'Advanced Scraper', icon: Database },
     { id: 'optimizer', label: 'Optimize Prices', icon: TrendingUp },
@@ -134,6 +136,10 @@ function App() {
             onProductAdded={handleProductAdded}
             onNext={() => setActiveTab('scraper')}
           />
+        )}
+        
+        {activeTab === 'analysis' && (
+          <ProfitAnalyzer />
         )}
         
         {activeTab === 'scraper' && (
