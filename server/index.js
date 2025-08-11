@@ -285,28 +285,129 @@ const mockOptimizePrice = (product, competitorPrices) => {
 
 // API Routes
 
-// Load existing CSV data
-app.post('/api/products/load-csv', async (req, res) => {
+// Load hardcoded product data
+app.post('/api/products/load-hardcoded', async (req, res) => {
   try {
-    const csvPath = path.join(__dirname, '../Dzukou_Pricing_Overview_With_Names - Copy.csv')
-    
-    // Check if file exists
-    try {
-      await fs.access(csvPath)
-    } catch {
-      return res.status(404).json({ error: 'CSV file not found' })
-    }
-    
-    const csvProducts = await parseCSVData(csvPath)
+    // Hardcoded product data from the provided table
+    const hardcodedProducts = [
+      {
+        id: 'SG0001',
+        name: 'Reiek Peak Wooden Sunglasses (Incl. cork casing)',
+        category: 'Sunglasses',
+        currentPrice: 57.95,
+        unitCost: 14.23,
+        keywords: 'wooden sunglasses, eco sunglasses, sustainable eyewear',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'SG0002',
+        name: 'Fibonacci Wooden Sunglasses (Incl. cork casing)',
+        category: 'Sunglasses',
+        currentPrice: 61.50,
+        unitCost: 14.23,
+        keywords: 'wooden sunglasses, eco sunglasses, sustainable eyewear',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'BT0005',
+        name: 'Elephant Falls Thermos Bottle',
+        category: 'Bottles',
+        currentPrice: 31.95,
+        unitCost: 8.34,
+        keywords: 'thermos bottle, insulated bottle, water bottle',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'BT0012-13',
+        name: 'Saint Elias Thermos bottles',
+        category: 'Bottles',
+        currentPrice: 32.95,
+        unitCost: 9.31,
+        keywords: 'thermos bottle, insulated bottle, water bottle',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'BT0015-16',
+        name: 'Inca Trail Coffee Mugs',
+        category: 'Coffee mugs',
+        currentPrice: 31.95,
+        unitCost: 8.55,
+        keywords: 'coffee mug, ceramic mug, eco mug',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'PS0007',
+        name: 'Woodland Mouse Phone Stand',
+        category: 'Phone accessories',
+        currentPrice: 18.95,
+        unitCost: 3.01,
+        keywords: 'phone stand, wooden phone stand, desk stand',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'NB0011-12',
+        name: 'Tiger Trail Notebooks',
+        category: 'Notebook',
+        currentPrice: 25.95,
+        unitCost: 6.79,
+        keywords: 'eco notebook, sustainable journal, recycled paper',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'NB0013-15',
+        name: 'Papillon Notebooks',
+        category: 'Notebook',
+        currentPrice: 23.95,
+        unitCost: 5.21,
+        keywords: 'eco notebook, sustainable journal, recycled paper',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'LB0017',
+        name: 'Jim Corbett Lunchbox Band 1200ML',
+        category: 'Lunchbox',
+        currentPrice: 32.95,
+        unitCost: 19.45,
+        keywords: '1200ml lunch box, large lunch container',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'LB0019',
+        name: 'Jim Corbett Lunchbox Band 800ML',
+        category: 'Lunchbox',
+        currentPrice: 30.95,
+        unitCost: 7.59,
+        keywords: '800ml lunch box, medium lunch container',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'SH0017-26',
+        name: 'Timeless Silk Colored Stole',
+        category: 'Other scarves and shawls',
+        currentPrice: 73.95,
+        unitCost: 39.48,
+        keywords: 'silk colored stole, silk scarf, colorful stole',
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'SH0025',
+        name: 'Silk Uncut White Stole',
+        category: 'Other scarves and shawls',
+        currentPrice: 114.95,
+        unitCost: 33.92,
+        keywords: 'white silk stole, white silk scarf',
+        createdAt: new Date().toISOString()
+      }
+    ]
     
     // Clear existing products and add CSV data
     products.length = 0
-    products.push(...csvProducts)
+    products.push(...hardcodedProducts)
     
-    res.json({ success: true, count: csvProducts.length })
+    res.json({ success: true, count: hardcodedProducts.length })
   } catch (error) {
-    console.error('Error loading CSV:', error)
-    res.status(500).json({ error: 'Error loading CSV data' })
+    console.error('Error loading data:', error)
+    res.status(500).json({ error: 'Error loading product data' })
   }
 })
 

@@ -15,7 +15,7 @@ import {
 
 const ProductManager = ({ products, onProductAdded, onNext }) => {
   const [showAddForm, setShowAddForm] = useState(false)
-  const [isLoadingCSV, setIsLoadingCSV] = useState(false)
+  const [isLoadingData, setIsLoadingData] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     id: '',
@@ -39,10 +39,10 @@ const ProductManager = ({ products, onProductAdded, onNext }) => {
     'Other scarves and shawls'
   ]
 
-  const loadExistingData = async () => {
-    setIsLoadingCSV(true)
+  const loadHardcodedData = async () => {
+    setIsLoadingData(true)
     try {
-      const response = await fetch('/api/products/load-csv', {
+      const response = await fetch('/api/products/load-hardcoded', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -52,15 +52,15 @@ const ProductManager = ({ products, onProductAdded, onNext }) => {
       if (response.ok) {
         const data = await response.json()
         onProductAdded()
-        alert(`Successfully loaded ${data.count} products from CSV!`)
+        alert(`Successfully loaded ${data.count} products from hardcoded data!`)
       } else {
-        throw new Error('Failed to load CSV data')
+        throw new Error('Failed to load product data')
       }
     } catch (error) {
-      console.error('Error loading CSV:', error)
-      alert('Error loading CSV data. Please try again.')
+      console.error('Error loading data:', error)
+      alert('Error loading product data. Please try again.')
     } finally {
-      setIsLoadingCSV(false)
+      setIsLoadingData(false)
     }
   }
   const handleSubmit = async (e) => {
@@ -156,11 +156,11 @@ const ProductManager = ({ products, onProductAdded, onNext }) => {
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-4 mb-8">
         <button 
-          onClick={loadExistingData}
-          disabled={isLoadingCSV}
+          onClick={loadHardcodedData}
+          disabled={isLoadingData}
           className="btn-primary disabled:opacity-50"
         >
-          {isLoadingCSV ? (
+          {isLoadingData ? (
             <>
               <RefreshCw className="w-5 h-5 loading-spinner" />
               Loading...
@@ -168,7 +168,7 @@ const ProductManager = ({ products, onProductAdded, onNext }) => {
           ) : (
             <>
               <FileText className="w-5 h-5" />
-              Load Existing CSV
+              Load Product Data
             </>
           )}
         </button>
@@ -183,7 +183,7 @@ const ProductManager = ({ products, onProductAdded, onNext }) => {
         
         <label className="btn-secondary cursor-pointer">
           <Upload className="w-5 h-5" />
-          Upload CSV
+          Upload Additional CSV
           <input 
             type="file" 
             accept=".csv" 

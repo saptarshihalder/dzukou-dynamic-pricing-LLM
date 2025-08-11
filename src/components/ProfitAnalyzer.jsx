@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 
 const ProfitAnalyzer = () => {
+  // Hardcoded product data from the business analysis table
   const [productData] = useState([
     { name: "Reiek Peak Wooden Sunglasses (Incl. cork casing)", id: "SG0001", currentPrice: 57.95, unitCost: 14.23 },
     { name: "Fibonacci Wooden Sunglasses (Incl. cork casing)", id: "SG0002", currentPrice: 61.50, unitCost: 14.23 },
